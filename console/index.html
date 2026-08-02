@@ -424,17 +424,19 @@ setInterval(() => {
  * the benchmark was wrong, so the page discards a warm-up pass first, exactly as
  * bench/bench.ts discards 500 iterations before measuring.
  *
- * The warm-up runs against clinic_info.hours (PUBLIC) so it neither touches a
- * restricted field nor inflates the blocked-reads counter, and its traces are
- * thrown away rather than shown.
+ * Warm-up traces are discarded and never reach the counters, which are only
+ * updated by say().
  */
 async function warmGate() {
   for (let i = 0; i < 300; i++) {
     await catalog.decide({
       callId: 'warmup',
       utterance: 'warmup',
-      intent: 'CLINIC_HOURS',
-      requested: { table: 'clinic_info', field: 'hours' },
+      // Warm the DEEPEST path, not a field without lineage: the recursive walk
+      // and its sort are the code that needs JIT, and a PUBLIC field with no
+      // edges never touches them.
+      intent: 'ASK_SUBSCRIBER_KEY',
+      requested: { table: 'claim_export', field: 'subscriber_key' },
       channel: 'PHONE',
       subjectVerified: true,
     });

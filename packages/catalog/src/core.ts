@@ -260,9 +260,14 @@ export class SnapshotGraph implements CatalogGraph {
           next.push(e.from);
         }
       }
-      atDepth.sort((a, b) => keyOf(a.from).localeCompare(keyOf(b.from)));
+      // Plain codepoint comparison, NOT localeCompare: the latter is
+      // locale-dependent, so Node and a browser under a different default
+      // locale could order hops differently and silently break the parity this
+      // ordering exists to guarantee. It also loads an ICU collator on first
+      // call, which dominated the first decision's latency.
+      atDepth.sort((a, b) => (keyOf(a.from) < keyOf(b.from) ? -1 : keyOf(a.from) > keyOf(b.from) ? 1 : 0));
       out.push(...atDepth);
-      frontier = next.sort((a, b) => a.localeCompare(b));
+      frontier = next.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     }
     return out;
   }
