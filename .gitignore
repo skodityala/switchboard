@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+*.log
+
+# Local SQLite artifacts — fixtures are committed as .sql/.json seeds, not binaries
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
