@@ -12,14 +12,17 @@
     }
   },
   "dependencies": {
-    "@switchboard/catalog": "*",
-    "@google/genai": "^2.15.0"
+    "@switchboard/catalog": "*"
   },
   "peerDependencies": {
-    "@huggingface/transformers": "^4.2.0"
+    "@huggingface/transformers": "^4.2.0",
+    "@google/genai": "^2.15.0"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
+      "optional": true
+    },
+    "@google/genai": {
       "optional": true
     }
   }

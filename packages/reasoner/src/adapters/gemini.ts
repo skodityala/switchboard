@@ -106,7 +106,10 @@ export class GeminiReasoner implements ReasonerPort {
     if (this.opts.clientFactory) {
       this.client = this.opts.clientFactory(key);
     } else {
-      const mod = (await import('@google/genai')) as unknown as {
+      // Runtime-built specifier: @google/genai is an OPTIONAL peer, so the
+      // compiler must not require it for anyone who does not use this adapter.
+      const pkg = '@google/genai';
+      const mod = (await import(/* @vite-ignore */ pkg)) as unknown as {
         GoogleGenAI: new (o: { apiKey: string }) => GenAIClient;
       };
       this.client = new mod.GoogleGenAI({ apiKey: key });

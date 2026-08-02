@@ -16,7 +16,13 @@
     "@switchboard/memory": "*",
     "@switchboard/reasoner": "*"
   },
-  "dependencies": {
+  "dependencies": {},
+  "peerDependencies": {
     "caspian-sdk": "^0.6.1"
+  },
+  "peerDependenciesMeta": {
+    "caspian-sdk": {
+      "optional": true
+    }
   }
 }

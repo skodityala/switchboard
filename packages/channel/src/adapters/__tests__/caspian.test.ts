@@ -19,7 +19,7 @@ import { SqliteMemory } from '@switchboard/memory';
 import { DeterministicReasoner } from '@switchboard/reasoner';
 import {
   CaspianChannelAdapter,
-  MissingCredentialError,
+  CaspianMissingCredentialError,
   toChannel,
   type CaspianClient,
   type CaspianConnection,
@@ -187,7 +187,7 @@ describe('qualifying properties (no credential needed)', () => {
     delete process.env['CASPIAN_API_KEY'];
     try {
       const a = new CaspianChannelAdapter({ catalog, reasoner, channels: ['email', 'discord'] });
-      await expect(a.connect()).rejects.toThrow(MissingCredentialError);
+      await expect(a.connect()).rejects.toThrow(CaspianMissingCredentialError);
       await expect(a.connect()).rejects.toThrow(/set CASPIAN_API_KEY/);
     } finally {
       if (prev !== undefined) process.env['CASPIAN_API_KEY'] = prev;

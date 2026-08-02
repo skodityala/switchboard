@@ -78,10 +78,10 @@ export function toChannel(caspianChannel: string): Channel {
   }
 }
 
-export class MissingCredentialError extends Error {
+export class CaspianMissingCredentialError extends Error {
   constructor() {
     super('set CASPIAN_API_KEY to run the Caspian adapter (see docs/adapters/CASPIAN.md)');
-    this.name = 'MissingCredentialError';
+    this.name = 'CaspianMissingCredentialError';
   }
 }
 
@@ -129,7 +129,7 @@ export class CaspianChannelAdapter {
 
   private apiKey(): string {
     const key = this.opts.apiKey ?? process.env['CASPIAN_API_KEY'];
-    if (key === undefined || key === '') throw new MissingCredentialError();
+    if (key === undefined || key === '') throw new CaspianMissingCredentialError();
     return key;
   }
 
@@ -142,7 +142,9 @@ export class CaspianChannelAdapter {
     } else {
       // Dynamic import: a missing package is a clear runtime error rather than a
       // build failure for anyone who does not have a Caspian account.
-      const mod = (await import('caspian-sdk')) as unknown as {
+      // Runtime-built specifier: caspian-sdk is an OPTIONAL peer.
+      const pkg = 'caspian-sdk';
+      const mod = (await import(/* @vite-ignore */ pkg)) as unknown as {
         CommClient: new (o?: { apiKey?: string }) => CaspianClient;
       };
       this.client = new mod.CommClient({ apiKey: key });
