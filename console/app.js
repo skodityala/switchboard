@@ -799,8 +799,19 @@ class DeterministicReasoner {
         return 'UNKNOWN';
     }
     async respond(utterance, state, catalog) {
+        return this.respondWithIntent(utterance, state, catalog, this.classifyIntent(utterance.text));
+    }
+    /**
+     * Same turn pipeline, with the intent supplied from outside.
+     *
+     * This is what lets a different reasoner — the browser's WASM on-device model,
+     * Gemini, anything — propose an intent while every field access still travels
+     * this one code path to the gate. Without it the page would have to
+     * reimplement the pipeline, which is exactly the duplication the parity test
+     * exists to prevent.
+     */
+    async respondWithIntent(utterance, state, catalog, intent) {
         const started = performance.now();
-        const intent = this.classifyIntent(utterance.text);
         const fields = INTENT_FIELDS[intent];
         const traces = [];
         let denied = false;

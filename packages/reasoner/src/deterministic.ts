@@ -222,8 +222,25 @@ export class DeterministicReasoner implements ReasonerPort {
     state: CallState,
     catalog: CatalogPort,
   ): Promise<Turn> {
+    return this.respondWithIntent(utterance, state, catalog, this.classifyIntent(utterance.text));
+  }
+
+  /**
+   * Same turn pipeline, with the intent supplied from outside.
+   *
+   * This is what lets a different reasoner — the browser's WASM on-device model,
+   * Gemini, anything — propose an intent while every field access still travels
+   * this one code path to the gate. Without it the page would have to
+   * reimplement the pipeline, which is exactly the duplication the parity test
+   * exists to prevent.
+   */
+  async respondWithIntent(
+    utterance: Utterance,
+    state: CallState,
+    catalog: CatalogPort,
+    intent: Intent,
+  ): Promise<Turn> {
     const started = performance.now();
-    const intent = this.classifyIntent(utterance.text);
     const fields: readonly FieldRef[] = INTENT_FIELDS[intent];
 
     const traces: AccessTrace[] = [];

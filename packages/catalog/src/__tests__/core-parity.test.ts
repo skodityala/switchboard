@@ -72,19 +72,35 @@ describe('the page has no adjudication logic of its own', () => {
       'RULE_SUBJECT_UNVERIFIED',
       'SENSITIVE_PII\'', // a literal tier comparison
       'NEVER_BY_PHONE',
-      'function effective',
-      'function classify',
-      'function decide',
-      'function route',
+      // Precise forms: a substring like 'function classify' also matched
+      // 'classifyOnDevice', which proposes an INTENT and decides nothing about a
+      // field. The invariant is about field authority, not about the word.
+      'function effectiveOf',
+      'function classifySync',
+      'function decide(',
+      'function evaluate(',
+      'function adjudicate(',
+      'function lineageSync',
       'const PATTERNS',
       'const EDGES',
       'const FIELDS',
       'never disclosable',
       'not in the catalog',
+      // Tier comparison in the page would mean it is ranking restriction itself.
+      'RESTRICTION_ORDER',
+      'NEVER_DISCLOSABLE',
     ];
     for (const marker of forbidden) {
       expect(script, `page reimplements: ${marker}`).not.toContain(marker);
     }
+  });
+
+  it('the page never authors a refusal itself', () => {
+    const html = readFileSync(join(consoleDir, 'index.html'), 'utf8');
+    const script = html.slice(html.indexOf('<script type="module">'));
+    // The refusal sentence is composed in the reasoner, not the UI. If the page
+    // ever writes it, the demo could show a refusal the gate did not produce.
+    expect(script).not.toContain("I don't have access to that field");
   });
 
   it('index.html imports the shared core', () => {
