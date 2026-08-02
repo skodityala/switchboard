@@ -14,7 +14,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { arch, platform, cpus, totalmem } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { SqliteCatalog } from '@switchboard/catalog';
@@ -43,7 +43,7 @@ function newCatalog(): SqliteCatalog {
   });
 }
 
-/** Reads an Arm/Darwin platform fact, or undefined where unavailable. */
+/** Reads a Darwin sysctl value, or undefined where unavailable. */
 function sysctl(key: string): number | undefined {
   try {
     const out = execFileSync('sysctl', ['-n', key], { encoding: 'utf8' }).trim();
@@ -54,7 +54,72 @@ function sysctl(key: string): number | undefined {
   }
 }
 
+/** Reads a Linux sysfs integer, or undefined. */
+function sysfs(path: string): number | undefined {
+  try {
+    const raw = readFileSync(path, 'utf8').trim();
+    const m = /^(\d+)([KMG])?/.exec(raw);
+    if (!m) return undefined;
+    const mult = m[2] === 'K' ? 1024 : m[2] === 'M' ? 1024 ** 2 : m[2] === 'G' ? 1024 ** 3 : 1;
+    return Number(m[1]) * mult;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Cache and topology facts, whichever OS this is.
+ *
+ * The cross-arch CI comparison runs Ubuntu on both arm64 and x86_64, so the
+ * probe has to work on Linux or half the comparison arrives blank.
+ */
+function topology(): Record<string, number | undefined> {
+  if (platform() === 'darwin') {
+    return {
+      performanceCores: sysctl('hw.perflevel0.physicalcpu'),
+      efficiencyCores: sysctl('hw.perflevel1.physicalcpu'),
+      cacheLineBytes: sysctl('hw.cachelinesize'),
+      l1dBytes: sysctl('hw.l1dcachesize'),
+      l2Bytes: sysctl('hw.l2cachesize'),
+      pageSizeBytes: sysctl('hw.pagesize'),
+    };
+  }
+  const base = '/sys/devices/system/cpu/cpu0/cache';
+  return {
+    performanceCores: undefined,
+    efficiencyCores: undefined,
+    cacheLineBytes: sysfs(`${base}/index0/coherency_line_size`),
+    l1dBytes: sysfs(`${base}/index0/size`),
+    l2Bytes: sysfs(`${base}/index2/size`),
+    pageSizeBytes: undefined,
+  };
+}
+
+/**
+ * Timer noise floor for THIS machine.
+ *
+ * Cloud runners are noisy and their clocks differ from a laptop's. Every
+ * latency figure has to be reported against the floor measured on the same
+ * host, or a cross-arch difference could be nothing but timer granularity.
+ */
+function timerNoiseFloorMicros(): { p50: number; p95: number } {
+  const s: number[] = [];
+  for (let i = 0; i < 20_000; i++) {
+    const a = performance.now();
+    const b = performance.now();
+    s.push((b - a) * 1000);
+  }
+  s.sort((x, y) => x - y);
+  return {
+    p50: +(s[Math.floor(s.length * 0.5)] ?? 0).toFixed(4),
+    p95: +(s[Math.ceil(s.length * 0.95) - 1] ?? 0).toFixed(4),
+  };
+}
+
 async function main(): Promise<void> {
+  // Measured first, before any load, so it reflects an idle host.
+  const noiseFloor = timerNoiseFloorMicros();
+
   // ── cold start: process already up, catalog constructed from scratch ──────
   const coldT0 = performance.now();
   const coldCatalog = newCatalog();
@@ -275,15 +340,12 @@ async function main(): Promise<void> {
       // Arm-specific topology. big.LITTLE (P/E cores), 128-byte cache lines and
       // 16 KB pages are Arm platform properties, not x86 ones — they are why the
       // 'runs on a low-power core' claim below is credible.
-      arm: {
-        performanceCores: sysctl('hw.perflevel0.physicalcpu'),
-        efficiencyCores: sysctl('hw.perflevel1.physicalcpu'),
-        cacheLineBytes: sysctl('hw.cachelinesize'),
-        l1dBytes: sysctl('hw.l1dcachesize'),
-        l2Bytes: sysctl('hw.l2cachesize'),
-        pageSizeBytes: sysctl('hw.pagesize'),
-      },
+      topology: topology(),
+      // CI sets this so a committed result is traceable to a specific run.
+      ciRunId: process.env['GITHUB_RUN_ID'] ?? null,
+      ciRunner: process.env['RUNNER_NAME'] ?? null,
     },
+    timerNoiseFloorMicros: noiseFloor,
     catalogDecision: {
       iterations: ITERATIONS,
       warmupDiscarded: WARMUP,
@@ -340,7 +402,7 @@ async function main(): Promise<void> {
       const perSecPerCore = Math.round(1e6 / p95);
       // A 3-provider clinic: ~200 calls/day, ~6 field reads per call.
       const decisionsPerDay = 1200;
-      const l2 = sysctl('hw.l2cachesize') ?? 0;
+      const l2 = topology()['l2Bytes'] ?? 0;
       const catalogBytes = 10_339; // schema.sql + both fixtures, measured
       return {
         decisionsPerSecPerCore: perSecPerCore,
@@ -378,6 +440,7 @@ async function main(): Promise<void> {
   console.log(`${p.cpuModel} · ${p.arch} · ${p.cpuCount} cores · ${p.totalMemGB} GB · Node ${p.node}\n`);
   console.log(`  decision p50           ${d.p50Micros} µs`);
   console.log(`  decision p95           ${d.p95Micros} µs   <- headline`);
+  console.log(`  timer noise floor      p50 ${results.timerNoiseFloorMicros.p50} µs / p95 ${results.timerNoiseFloorMicros.p95} µs  (p95 ratio ${Math.round(d.p95Micros / Math.max(results.timerNoiseFloorMicros.p95, 0.0001)).toLocaleString()}x)`);
   console.log(`  decision p99           ${d.p99Micros} µs`);
   console.log(`  deepest walk p95       ${results.deepestLineageWalk.p95Micros} µs  (3 hops)`);
   console.log(`  full turn p95          ${results.fullTurn.p95Micros} µs`);
