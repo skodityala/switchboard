@@ -14,6 +14,7 @@ import {
   DataHubCatalog,
   MissingCredentialError,
   TERM_TO_TIER,
+  accessLogUrn,
   datasetUrn,
   fieldKeyFromUrn,
   type GraphQLTransport,
@@ -180,6 +181,47 @@ describe('CONTRIBUTES BACK to the graph — the criterion that decides scoring',
         ?.variables['input'] as Record<string, unknown>)['label'],
     );
     expect(label).toContain('ALLOW');
+  });
+
+  it('usage metadata: every decision is reported as an operation', async () => {
+    await catalog.decide({
+      callId: 'c-op', utterance: 'ssn', intent: 'ASK_SSN',
+      requested: { table: 'patient', field: 'ssn' },
+      channel: 'PHONE', subjectVerified: true,
+    });
+    const op = fake.queries.filter((q) => q.query.includes('reportOperation')).pop();
+    expect(op, 'no reportOperation mutation was issued').toBeTruthy();
+    const input = op?.variables['input'] as Record<string, unknown>;
+    expect(String(input['urn'])).toBe(datasetUrn('patient'));
+    expect(String(input['customOperationType'])).toBe('SWITCHBOARD_DENY');
+    expect(String(input['sourceType'])).toBe('DATA_PROCESS');
+  });
+
+  it('access-decision lineage: the gated dataset feeds the access log', async () => {
+    await catalog.decide({
+      callId: 'c-lin', utterance: 'ssn', intent: 'ASK_SSN',
+      requested: { table: 'patient', field: 'ssn' },
+      channel: 'PHONE', subjectVerified: true,
+    });
+    const lin = fake.queries.filter((q) => q.query.includes('updateLineage')).pop();
+    expect(lin, 'no updateLineage mutation was issued').toBeTruthy();
+    const input = lin?.variables['input'] as {
+      edgesToAdd: { upstreamUrn: string; downstreamUrn: string }[];
+    };
+    expect(input.edgesToAdd[0]?.upstreamUrn).toBe(datasetUrn('patient'));
+    expect(input.edgesToAdd[0]?.downstreamUrn).toBe(accessLogUrn());
+  });
+
+  it('the access-log edge is written once per dataset, not once per decision', async () => {
+    const req = {
+      callId: 'c-dup', utterance: 'ssn', intent: 'ASK_SSN',
+      requested: { table: 'patient', field: 'ssn' },
+      channel: 'PHONE' as const, subjectVerified: true,
+    };
+    await catalog.decide(req);
+    await catalog.decide(req);
+    const edges = fake.queries.filter((q) => q.query.includes('updateLineage'));
+    expect(edges.length).toBe(1);
   });
 
   it('a write-back failure never breaks the gate', async () => {
