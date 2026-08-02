@@ -10,3 +10,4 @@ dist/
 *.sqlite
 *.sqlite3
 bench/dist/
+console/app.js

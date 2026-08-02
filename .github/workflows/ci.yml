@@ -15,4 +15,7 @@ jobs:
           node-version: '24'
       - run: npm ci
       - run: npm run typecheck
+      # Built before tests: core-parity.test.ts asserts the console bundle is
+      # generated from the same compiled output the suite imports.
+      - run: npm run build:console
       - run: npm test

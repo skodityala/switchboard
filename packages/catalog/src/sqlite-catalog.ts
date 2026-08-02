@@ -19,6 +19,12 @@ import type {
   MetadataSink,
   RuleId,
 } from './port.js';
+import {
+  adjudicate,
+  type CatalogGraph,
+  type CatalogSnapshot,
+  type DeclaredTier,
+} from './core.js';
 
 // node:sqlite is a builtin, but bundlers' builtin lists can lag behind it and
 // rewrite a static import to a bare specifier. createRequire sidesteps that.
@@ -38,28 +44,6 @@ type DatabaseSyncCtor = new (path: string) => SqliteDb;
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as {
   DatabaseSync: DatabaseSyncCtor;
 };
-
-/**
- * Restriction order. Index is the comparison key: a higher index is strictly
- * more restrictive, which is what lets lineage propagation be a max().
- */
-const RESTRICTION_ORDER = [
-  'PUBLIC',
-  'OPERATIONAL',
-  'PII',
-  'SENSITIVE_PII',
-  'PHI',
-] as const;
-
-type DeclaredTier = (typeof RESTRICTION_ORDER)[number];
-
-const rank = (t: DeclaredTier): number => RESTRICTION_ORDER.indexOf(t);
-
-/** Tiers that no phone or chat channel may ever disclose, under any verification. */
-const NEVER_DISCLOSABLE: ReadonlySet<Classification> = new Set<Classification>([
-  'SENSITIVE_PII',
-  'PHI',
-]);
 
 /** Sink that writes traces to the local audit log only. No external service. */
 export class LocalMetadataSink implements MetadataSink {
@@ -83,7 +67,7 @@ export interface SqliteCatalogOptions {
   readonly now?: () => Date;
 }
 
-export class SqliteCatalog implements CatalogPort {
+export class SqliteCatalog implements CatalogPort, CatalogGraph {
   private readonly db: SqliteDb;
   private readonly now: () => Date;
   private seq = 0;
@@ -108,6 +92,11 @@ export class SqliteCatalog implements CatalogPort {
    * who adds a column and forgets to classify it gets a refusal, not a leak.
    */
   async classify(ref: FieldRef): Promise<Classification> {
+    return this.classifySync(ref);
+  }
+
+  /** Synchronous form the core consumes. */
+  classifySync(ref: FieldRef): Classification {
     const row = this.db
       .prepare(
         'SELECT classification FROM field WHERE dataset_name = ? AND name = ?',
@@ -121,6 +110,11 @@ export class SqliteCatalog implements CatalogPort {
    * Ordered nearest-first so the panel renders the chain top-down.
    */
   async lineage(ref: FieldRef): Promise<readonly LineageHop[]> {
+    return this.lineageSync(ref);
+  }
+
+  /** Synchronous form the core consumes. */
+  lineageSync(ref: FieldRef): readonly LineageHop[] {
     const rows = this.db
       .prepare(
         `WITH RECURSIVE up(ds, fl, depth) AS (
@@ -138,7 +132,10 @@ export class SqliteCatalog implements CatalogPort {
          JOIN lineage_edge e ON e.to_dataset = up.ds AND e.to_field = up.fl
          JOIN field fsrc ON fsrc.dataset_name = e.from_dataset
                         AND fsrc.name = e.from_field
-         ORDER BY up.depth ASC`,
+         -- Canonical hop order: depth first, then source key. SQL's ORDER BY and
+         -- the SnapshotGraph walk must agree exactly, or the trace panel would
+         -- render a different chain than the audit log recorded.
+         ORDER BY up.depth ASC, e.from_dataset ASC, e.from_field ASC`,
       )
       .all(ref.table, ref.field) as Array<{
       from_dataset: string;
@@ -158,141 +155,21 @@ export class SqliteCatalog implements CatalogPort {
   }
 
   /**
-   * Effective tier: the most restrictive tier anywhere upstream, including the
-   * field itself. This is the rule a keyword filter cannot express — a derived
-   * column classified loosely by the operator still inherits its source's tier.
-   */
-  private async effective(
-    ref: FieldRef,
-    declared: Classification,
-  ): Promise<Classification> {
-    if (declared === 'UNCLASSIFIED') return 'UNCLASSIFIED';
-    const hops = await this.lineage(ref);
-    return hops.reduce<Classification>((worst, hop) => {
-      const t = hop.inheritedClassification;
-      if (t === 'UNCLASSIFIED' || worst === 'UNCLASSIFIED') return worst;
-      return rank(t as DeclaredTier) > rank(worst as DeclaredTier) ? t : worst;
-    }, declared);
-  }
-
-  /**
    * THE GATE. The only path from a field to a response. Returns a trace for
    * every call — allow and deny share one shape, because a denial is a decision,
    * not an error.
    */
   async decide(request: AccessRequest): Promise<AccessTrace> {
-    const started = performance.now();
-
-    const declared = await this.classify(request.requested);
-    const effective = await this.effective(request.requested, declared);
-    const lineage = declared === 'UNCLASSIFIED' ? [] : await this.lineage(request.requested);
-
-    const { decision, rule, rationale } = this.evaluate(request, declared, effective);
-
-    const durationMicros = Math.round((performance.now() - started) * 1000);
-
-    const trace: AccessTrace = {
+    // The gate itself lives in core.ts. This adapter supplies storage only, so
+    // there is exactly one implementation of propagation, rule order and trace
+    // construction — the browser console executes this same function.
+    const trace = adjudicate(this, request, {
       traceId: `tr_${String(++this.seq).padStart(6, '0')}`,
-      callId: request.callId,
-      utterance: request.utterance,
-      intent: request.intent,
-      requested: request.requested,
-      resolvedClassification: declared,
-      effectiveClassification: effective,
-      decision,
-      rule,
-      rationale,
-      lineage,
-      channel: request.channel,
-      subjectVerified: request.subjectVerified,
       decidedAt: this.now().toISOString(),
-      durationMicros,
-    };
-
+    });
     this.persist(trace);
     await this.sink.emit(trace);
     return trace;
-  }
-
-  /**
-   * Rule evaluation, ordered most-restrictive-first. Exactly one rule fires and
-   * it is named in the trace, so the panel can show *why* rather than just what.
-   */
-  private evaluate(
-    request: AccessRequest,
-    declared: Classification,
-    effective: Classification,
-  ): { decision: Decision; rule: RuleId; rationale: string } {
-    // 1. Fail closed. Never seen this field ⇒ deny.
-    if (effective === 'UNCLASSIFIED') {
-      return {
-        decision: 'DENY',
-        rule: 'RULE_UNCLASSIFIED_DENY',
-        rationale: `${request.requested.table}.${request.requested.field} is not in the catalog. Unclassified fields are denied by default.`,
-      };
-    }
-
-    // 2. Never disclosable by phone or chat, at any verification level.
-    if (NEVER_DISCLOSABLE.has(effective)) {
-      const inherited = effective !== declared;
-      return {
-        decision: 'DENY',
-        rule: 'RULE_NEVER_BY_PHONE',
-        rationale: inherited
-          ? `${request.requested.table}.${request.requested.field} is classified ${declared}, but inherits ${effective} through lineage. Never disclosable by phone.`
-          : `${request.requested.table}.${request.requested.field} is ${effective}. Never disclosable by phone under any verification.`,
-      };
-    }
-
-    // 3. PII requires a verified data subject.
-    if (effective === 'PII') {
-      if (!request.subjectVerified) {
-        return {
-          decision: 'DENY',
-          rule: 'RULE_SUBJECT_UNVERIFIED',
-          rationale: `${request.requested.field} is PII and the caller is not yet verified.`,
-        };
-      }
-      if (
-        request.callerSubjectId === undefined ||
-        request.rowSubjectId === undefined ||
-        request.callerSubjectId !== request.rowSubjectId
-      ) {
-        return {
-          decision: 'DENY',
-          rule: 'RULE_SUBJECT_MISMATCH',
-          rationale: `Verified caller is not the data subject for this record.`,
-        };
-      }
-      return {
-        decision: 'ALLOW',
-        rule: 'RULE_SUBJECT_SELF_ALLOW',
-        rationale: `Verified data subject reading their own PII.`,
-      };
-    }
-
-    // 4. Operational data requires verification, but not subject identity.
-    if (effective === 'OPERATIONAL') {
-      if (!request.subjectVerified) {
-        return {
-          decision: 'DENY',
-          rule: 'RULE_SUBJECT_UNVERIFIED',
-          rationale: `${request.requested.field} requires caller verification.`,
-        };
-      }
-      return {
-        decision: 'ALLOW',
-        rule: 'RULE_OPERATIONAL_ALLOW',
-        rationale: `Operational field released to a verified caller.`,
-      };
-    }
-
-    // 5. Public.
-    return {
-      decision: 'ALLOW',
-      rule: 'RULE_PUBLIC_ALLOW',
-      rationale: `Public information.`,
-    };
   }
 
   /** Append-only audit row. This table IS the observability artifact. */
@@ -379,6 +256,56 @@ export class SqliteCatalog implements CatalogPort {
       decidedAt: r['decided_at'] as string,
       durationMicros: r['duration_micros'] as number,
     }));
+  }
+
+  /**
+   * Serialise the catalog for the browser console. Generated from this same
+   * SQLite database, so the console's data cannot drift from the fixture the
+   * suite tests — parity is asserted field-by-field in core-parity.test.ts.
+   */
+  snapshot(): CatalogSnapshot {
+    const fields = this.db
+      .prepare(
+        `SELECT dataset_name || '.' || name AS k, classification, justification
+         FROM field ORDER BY k`,
+      )
+      .all() as Array<{ k: string; classification: DeclaredTier; justification: string }>;
+
+    const edges = this.db
+      .prepare(
+        `SELECT from_dataset || '.' || from_field AS f,
+                to_dataset   || '.' || to_field   AS t,
+                transform
+         FROM lineage_edge ORDER BY f, t`,
+      )
+      .all() as Array<{ f: string; t: string; transform: string }>;
+
+    let values: Array<{ k: string; subject_id: string; value: string }> = [];
+    try {
+      values = this.db
+        .prepare(
+          `SELECT table_name || '.' || field_name AS k, subject_id, value
+           FROM row_store ORDER BY k, subject_id`,
+        )
+        .all() as Array<{ k: string; subject_id: string; value: string }>;
+    } catch {
+      values = []; // row_store is optional; the gate never needs it to refuse.
+    }
+
+    const fieldMap: Record<string, { classification: DeclaredTier; justification: string }> = {};
+    for (const f of fields) {
+      fieldMap[f.k] = { classification: f.classification, justification: f.justification };
+    }
+    const valueMap: Record<string, Record<string, string>> = {};
+    for (const v of values) {
+      (valueMap[v.k] ??= {})[v.subject_id] = v.value;
+    }
+
+    return {
+      fields: fieldMap,
+      edges: edges.map((e) => ({ from: e.f, to: e.t, transform: e.transform })),
+      values: valueMap,
+    };
   }
 
   close(): void {
