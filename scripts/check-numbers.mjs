@@ -9,6 +9,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const r = JSON.parse(readFileSync('bench/results.json', 'utf8'));
+let bad = 0;
+
 const docs = ['README.md', ...readdirSync('docs/submissions').map((f) => join('docs/submissions', f))]
   .filter((f) => f.endsWith('.md'));
 
@@ -46,7 +48,6 @@ if (docs.includes(armDoc)) {
 }
 
 // Figures that were withdrawn or superseded and must appear NOWHERE.
-let bad = 0;
 const dead = ['24 KB', '12.2 MB', '12.9 MB', '7.2 MB', '100.1 µs', '910.6', '1,189×', '132 decision'];
 
 for (const f of docs) {
@@ -56,7 +57,12 @@ for (const f of docs) {
     // when it appears WITHOUT that qualifier — the withdrawn figure was a heap
     // measurement, and the two must never be confusable in prose.
     const legitimate = d === '12.9 MB' && /12\.9\u202fMB ONNX-runtime WASM/.test(text);
-    if (text.includes(d) && !legitimate) {
+    // Digit-boundary match: an L2 size of '1024 KB' contains the substring
+    // '24 KB' (the withdrawn bundle figure). Substring matching is too loose
+    // for numeric claims, so require that no digit or dot precedes the match.
+    const esc = d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const boundary = new RegExp('(?<![0-9.])' + esc);
+    if (boundary.test(text) && !legitimate) {
       console.error(`STALE  ${f}: contains withdrawn figure "${d}"`);
       bad++;
     }

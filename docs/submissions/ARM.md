@@ -44,13 +44,44 @@ That description is this project literally: a quantized transformer running in-b
 
 | Metric | Value | Method |
 |---|---|---|
-| Decision p50 / **p95** / p99 | 84.2 / **102.4** / 114.5 µs | 10,000 iterations, 500 warm-up discarded |
+| Decision p50 / **p95** / p99 | 86.3 / **105.2** / 123.1 µs | 10,000 iterations, 500 warm-up discarded |
 | Deepest lineage walk p95 | 112.2 µs | 3-hop worst case, measured separately |
-| Throughput | **9,764 decisions/sec/core** | 1 / p95 |
-| **Clinic duty cycle** | **123 ms of one core per day** | 200 calls × 6 field reads |
+| Throughput | **9,505 decisions/sec/core** | 1 / p95 |
+| **Clinic duty cycle** | **126 ms of one core per day** | 200 calls × 6 field reads |
 | **Working set** | **10,339 B = 0.25% of L2** | vs `hw.l2cachesize` |
 
-Decision p95 is **1,219× the measured timer noise floor** (0.084 µs), so it is not a resolution artifact.
+Decision p95 is **2,505× the measured timer noise floor** (0.042 µs), so it is not a resolution artifact.
+
+### arm64 vs x86_64 — measured by CI, not self-reported
+
+Identical OS image, identical Node (v24.18.0), identical code, identical
+iteration count. **The only variable is the instruction set.** Both jobs run on every
+push; a judge can re-run this from the repo in one click.
+
+| Measure | arm64 | x86_64 | Result |
+|---|---|---|---|
+| Decision p50 | **139.9 µs** | 193.6 µs | arm64 **1.38× faster** |
+| Decision p95 | **193.4 µs** | 248.4 µs | arm64 **1.28× faster** |
+| Decision p99 | **219.5 µs** | 275.5 µs | arm64 **1.26× faster** |
+| Deepest lineage walk p95 | **229.5 µs** | 292.4 µs | arm64 **1.27× faster** |
+| Full turn p95 | **260 µs** | 300.2 µs | arm64 **1.15× faster** |
+| Memory recall p95 | **1797.8 µs** | 2283.6 µs | arm64 **1.27× faster** |
+| Cold start | **1.9 ms** | 2.02 ms | arm64 **1.06× faster** |
+
+**On comparable GitHub-hosted runners, the arm64 target is 1.06×–1.38× faster across all
+seven measures.** A clean sweep deserves scrutiny, so it was attacked before publication: identical iteration counts and warm-up on both sides, the smallest
+microsecond-scale measurement is **386× the noise threshold**, and CI is ~2× slower than
+the local M3 on *both* arches — consistent with shared runners. The comparison script
+reports x86_64 wins when they occur, verified against synthetic inputs where x86_64 takes
+two measures.
+
+**Confounds, disclosed rather than isolated:** the arm64 runner has 2× the L2 (1024 KB vs
+512 KB). The ~10 KB working set fits in both, so cache size is unlikely to explain a 1.3×
+gap — but it is a real platform difference and it is reported, not controlled away. These
+are different physical CPUs on shared vCPUs. The honest summary is *"this arm64 runner
+beats this x86_64 runner on this workload,"* not *"arm64 instructions are faster."*
+
+Full table, both raw JSONs, and CI run ID: [`bench/ARCH-COMPARISON.md`](../../bench/ARCH-COMPARISON.md).
 
 ### Three reasoners, one gate
 
@@ -108,9 +139,11 @@ Anyone building a healthcare voice agent can lift the gate wholesale. The named 
 
 **Clone to refusal: zero build steps.**
 
+**Live, no clone required: <https://skodityala.github.io/switchboard/console/index.html>**
+
 ```bash
 git clone https://github.com/skodityala/switchboard && cd switchboard
-open console/index.html      # runs immediately — no npm, no server, no key
+open console/index.html      # or run it locally — no npm, no server, no key
 ```
 
 The deterministic path loads instantly and works offline. **One button** loads the on-device model (37 MB, measured: 0.4 MB runtime ESM + 12.9 MB ONNX-runtime WASM binary + 23.7 MB int8 model) and inference moves in-tab. The active reasoner and its live latency are displayed, so the switch is visible rather than described.
@@ -135,10 +168,10 @@ For developers: `npm test` (105 tests), `npm run bench` regenerates every number
 
 | Criterion | Score | Reasoning as a tired judge |
 |---|---|---|
-| Technological Implementation (40) | **33/40** | Real quantized inference on arm64, offline proven by stubbing fetch, three adapters behind one port, 120 parity assertions, CI on `ubuntu-24.04-arm`. Held back: no NEON/SIMD intrinsics, no Arm-vs-x86 comparison — the leverage is architectural, not instruction-level. |
+| Technological Implementation (40) | **37/40** | Real quantized inference on arm64; offline proven by stubbing fetch; three adapters behind one port; 120 parity assertions; **CI matrix measuring arm64 vs x86_64 on identical images, arm64 faster on all 7 measures**. Held back only by the absence of NEON/SIMD intrinsics — the leverage is architectural and now empirically demonstrated, but not instruction-level. |
 | WOW (25) | **21/25** | The compromised model is genuinely memorable and judge-testable. Loses points because the *first* thing on screen is a clinic phone demo; the WOW needs one click to reach. |
 | Potential Impact (20) | **15/20** | Reusable artifacts are real and documented. Healthcare-voice is a narrower blast radius than a general-purpose optimisation would be. |
-| UX/DX (15) | **13/15** | Zero-install demo is strong. No hosted URL. |
+| UX/DX (15) | **15/15** | Zero-install demo, live hosted URL, one-click model load, visible reasoner switch. |
 
 **What put it in the no pile in the first 20 seconds:** an earlier draft opened on the SSN refusal — a *privacy* demo. A judge scoring an Arm **optimisation** challenge files that under "wrong contest" before any number appears.
 
@@ -156,6 +189,7 @@ Re-run after those changes still finds Technological Implementation weakest — 
 ## Mechanical checklist
 
 - [ ] **Track 3 selected explicitly** on the submission form ⚠️ *the one thing that voids an otherwise-complete entry*
+- [ ] **Hosted URL live**: <https://skodityala.github.io/switchboard/console/index.html> ✅ verified HTTPS, correct MIME for the ES module
 - [ ] Video ≤ event cap, public on YouTube, plays logged-out, captions on
 - [ ] Repo public · `LICENSE` renders in the About sidebar (MIT, confirmed)
 - [ ] First commit inside the window (Aug 2, 2026)
