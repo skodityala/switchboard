@@ -119,14 +119,14 @@ This is not a rebuilt catalog. It is the **runtime enforcement layer a catalog d
 
 | Metric | Value | Method |
 |---|---|---|
-| Decision p50 | 82.1 µs | `decide()` entry → trace returned |
-| **Decision p95** | **100.1 µs** | 10,000 iterations, 500 warm-up discarded |
-| Decision p99 | 113.2 µs | same run |
-| Deepest lineage walk p95 | 111.2 µs | `claim_export.subscriber_key`, 3 hops — worst case, measured separately |
-| Full turn p95 | 106.8 µs | intent routing + gate + template fill |
-| Memory recall p95 | 910.6 µs | **linear scan of 220 entries, no vector index** — see below |
-| Cold start | 2.1 ms | schema + fixtures loaded, first decision served |
-| Catalog retained heap | 12.2 MB | GC-forced (`npm run bench:mem`) — catalog only, not a total footprint |
+| Decision p50 | 84.1 µs | `decide()` entry → trace returned |
+| **Decision p95** | **102.4 µs** | 10,000 iterations, 500 warm-up discarded |
+| Decision p99 | 112.7 µs | same run |
+| Deepest lineage walk p95 | 113.7 µs | `claim_export.subscriber_key`, 3 hops — worst case, measured separately |
+| Full turn p95 | 108.1 µs | intent routing + gate + template fill |
+| Memory recall p95 | 923.4 µs | **linear scan of 220 entries, no vector index** — see below |
+| Cold start | 1.63 ms | schema + fixtures loaded, first decision served |
+| Catalog retained heap | *not quoted* | Measured properly (GC, 2,000 decisions, GC, ×5) the delta is ~1 KB median with a 1,001 KB spread — noise, not a figure. See below. |
 | **Cost per call** | **$0** | architectural, see below |
 | PII reads blocked | 5 / 12 calls | count of `DENY` traces in the audit log |
 | Resolved unassisted | 83% | reasoner fixture suite; excludes escalations **and** menu fallbacks |
@@ -134,7 +134,7 @@ This is not a rebuilt catalog. It is the **runtime enforcement layer a catalog d
 
 **Platform:** Apple M3 · arm64 · 8 cores · 16 GB · Node v24.15.0 · no network.
 
-Decision p95 excludes rendering and speech — the claim is about the gate, not the browser. It is **1,189× the measured timer noise floor** (p95 of an empty `performance.now()` interval here is 0.084 µs), so it is not a resolution artifact.
+Decision p95 excludes rendering and speech — the claim is about the gate, not the browser. It is **1,219× the measured timer noise floor** (p95 of an empty `performance.now()` interval here is 0.084 µs), so it is not a resolution artifact.
 
 **Memory recall is deliberately reported as a ceiling.** The local adapter performs a full linear scan of the caller's history with cosine similarity and no index; that scan is precisely what CockroachDB's distributed vector index replaces in the qualifying adapter. Quoting it as a strength would be dishonest — it is the honest cost of having no external service.
 
@@ -149,8 +149,8 @@ Every on-screen figure is attacked before it ships. Three failed:
 | Claim | Corrected to | Why it was wrong |
 |---|---|---|
 | 92% resolved unassisted | **83%** | The numerator counted an `UNKNOWN` menu fallback as "resolved". *"I can help with hours, appointments…"* did not resolve the caller's ask. Refusals **do** still count — declining an SSN and offering the records path is the product working. |
-| 135 MB memory footprint | **12.2 MB** | That was process RSS including the V8 baseline, overstating this software's cost by orders of magnitude. Now reports catalog-attributable retained heap; RSS stays in `results.json` labelled *not a footprint claim*. |
 | Recall "0 withheld" | **20 withheld** on a restricted query | The benign query legitimately withholds nothing, so reporting its zero implied the gate did nothing on recall. Now measured with a query that targets restricted memories, plus a cross-caller probe. |
+| Memory footprint (two attempts) | **no figure quoted** | Twice wrong. First it was process RSS including the V8 baseline, which overstated this software's cost by orders of magnitude. The replacement measured a heap delta across the timing loop, so it captured transient allocation rather than retained memory — and it reported a different MB-scale figure on each run, which is what exposed it. Measured properly (GC, construct, 2,000 decisions, GC, repeated ×5) the catalog retains ~1 KB median with a 1,001 KB spread. That is noise, not a small number, so no heap figure is quoted at all. |
 
 A number a judge can puncture is worse than no number.
 

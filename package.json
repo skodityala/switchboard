@@ -17,7 +17,8 @@
     "test:watch": "tsc --build && vitest",
     "bench": "tsc --build && node bench/dist/bench.js",
     "bench:mem": "tsc --build && node --expose-gc bench/dist/bench.js",
-    "build:console": "tsc --build && node scripts/build-console.mjs"
+    "build:console": "tsc --build && node scripts/build-console.mjs",
+    "check:numbers": "node scripts/check-numbers.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

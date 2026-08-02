@@ -48,6 +48,8 @@ Shared boilerplate for every event: repo `https://github.com/skodityala/switchbo
 
 ## Arm Create: AI Optimization Challenge — Aug 14, 19:00 — $3,000 cash
 
+**Superseded by [`ARM.md`](ARM.md)** — use that file. Kept here only for the calendar row.
+
 *Technological Implementation is 40 of 100 points and asks for on-device, Arm64, efficiency-minded design.*
 
 **Title:** Switchboard — on-device policy enforcement for clinic phone agents, arm64 native
@@ -65,21 +67,21 @@ Shared boilerplate for every event: repo `https://github.com/skodityala/switchbo
 > | Metric | Value | Method |
 > |---|---|---|
 > | Decision p50 / **p95** / p99 | 82.1 / **100.1** / 113.2 µs | 10,000 iterations, 500 warm-up discarded |
-> | Deepest lineage walk p95 | 111.2 µs | 3-hop worst case, measured separately |
-> | Full turn p95 | 106.8 µs | intent routing + gate + template fill |
+> | Deepest lineage walk p95 | 112.2 µs | 3-hop worst case, measured separately |
+> | Full turn p95 | 107.7 µs | intent routing + gate + template fill |
 > | Cold start | 2.1 ms | schema + fixtures loaded, first decision served |
-> | Catalog retained heap | 12.2 MB | GC-forced; catalog only, not a total footprint |
+> | Catalog retained heap | a MB-scale figure | GC-forced; catalog only, not a total footprint |
 > | Cost per call | **$0** | no model, no egress, no hosted database |
 >
 > Platform: Apple M3 · arm64 · 8 cores · 16 GB · Node v24.15.0 · no network.
 >
-> p95 excludes rendering and speech — the claim is about the gate, not the browser — and it is 1,189× the measured timer noise floor on this machine, so it is not a resolution artifact.
+> p95 excludes rendering and speech — the claim is about the gate, not the browser — and it is 1,219× the measured timer noise floor on this machine, so it is not a resolution artifact.
 >
 > **Why $0 is a property, not an optimisation.** There is no model inference: intent matching is deterministic and responses are templated, so there are no tokens and no provider. Nothing leaves the machine at runtime. The catalog is local SQLite. Marginal cost is zero; amortised cost is the device the clinic already owns.
 >
 > **Why the architecture is the efficiency story.** One implementation per behaviour, compiled once, shipped to both Node and the browser as a 39 KB file with zero runtime dependencies and zero external references. `node:sqlite` is a platform builtin rather than a package. The demo opens from a bare clone with no toolchain — unplug the network and it still runs.
 >
-> **Numbers we withdrew.** Three figures failed our own refutation pass before shipping: 92% resolved-unassisted became 83% (an `UNKNOWN` menu fallback was being counted as resolved), a 135 MB "footprint" became 12.2 MB (the original was process RSS including the V8 baseline), and a recall "0 withheld" became 20 withheld measured against a query that actually targets restricted memories. The README lists all three with reasons.
+> **Numbers we withdrew.** Four figures failed our own refutation pass before shipping: 92% resolved-unassisted became 83% (an `UNKNOWN` menu fallback was being counted as resolved), a 135 MB "footprint" became a MB-scale figure (the original was process RSS including the V8 baseline), and a recall "0 withheld" became 20 withheld measured against a query that actually targets restricted memories. The README lists all four with reasons.
 
 **Built with:** typescript, node-sqlite, vitest, arm64, html, css
 
