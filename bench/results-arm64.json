@@ -1,0 +1,102 @@
+{
+  "platform": {
+    "arch": "arm64",
+    "platform": "linux",
+    "cpuModel": "unknown",
+    "cpuCount": 4,
+    "totalMemGB": 15.6,
+    "node": "v24.18.0",
+    "topology": {
+      "cacheLineBytes": 64,
+      "l1dBytes": 65536,
+      "l2Bytes": 1048576
+    },
+    "ciRunId": "30763301364",
+    "ciRunner": "GitHub Actions 1000000022"
+  },
+  "timerNoiseFloorMicros": {
+    "p50": 0.088,
+    "p95": 0.12
+  },
+  "catalogDecision": {
+    "iterations": 10000,
+    "warmupDiscarded": 500,
+    "p50Micros": 139.9,
+    "p95Micros": 193.4,
+    "p99Micros": 219.5,
+    "meanMicros": 156.4,
+    "note": "decide() only: classification + full lineage walk + rules + trace. Excludes rendering and speech."
+  },
+  "deepestLineageWalk": {
+    "target": "claim_export.subscriber_key",
+    "hops": 3,
+    "iterations": 2000,
+    "p95Micros": 229.5,
+    "note": "Worst-case chain in the fixture, measured separately from the average."
+  },
+  "fullTurn": {
+    "iterations": 2000,
+    "p95Micros": 260,
+    "note": "Intent routing + gate + template fill. Still no network, no model call."
+  },
+  "coldStart": {
+    "millis": 1.9,
+    "note": "Schema + fixtures loaded and first decision served, from a cold catalog."
+  },
+  "memory": {
+    "retainedMedianKB": 0,
+    "retainedSpreadKB": 996,
+    "samplesKB": [
+      995,
+      1,
+      0,
+      0,
+      -1
+    ],
+    "processRssMB": 163.4,
+    "gcForced": true,
+    "note": "retainedMedianKB is the catalog's RETAINED heap at steady state: GC, construct, 2000 decisions, GC, delta — repeated 5x. An earlier version measured the delta across the timing loop and reported 12.9/12.2/7.2 MB on successive runs; that was transient allocation, not retained memory, and it is withdrawn. Without --expose-gc (gcForced false) these samples are unreliable and should not be quoted. processRssMB is the whole Node process incl. the V8 baseline and is NOT a footprint claim."
+  },
+  "memoryRecall": {
+    "corpus": 220,
+    "iterations": 500,
+    "p50Micros": 1650,
+    "p95Micros": 1797.8,
+    "scannedPerQuery": 220,
+    "benignQuery": {
+      "hits": 5,
+      "withheld": 0
+    },
+    "restrictedQuery": {
+      "hits": 5,
+      "withheld": 20
+    },
+    "crossCallerProbe": {
+      "scanned": 0,
+      "hits": 0
+    },
+    "note": "Scoped recall over one caller's history, INCLUDING re-adjudication of every field-bearing hit. The local adapter is a full linear scan of the caller's entries with no vector index — that scan is precisely what a distributed vector index replaces in the CockroachDB adapter, so this figure is a ceiling, not a floor. withheld is reported for a query that TARGETS restricted memories; a benign query legitimately withholds nothing."
+  },
+  "armEfficiency": {
+    "decisionsPerSecPerCore": 5172,
+    "clinicDecisionsPerDay": 1200,
+    "cpuMillisPerDay": 232,
+    "workingSetBytes": 10339,
+    "workingSetPctOfL2": 0.99,
+    "note": "The whole enforcement layer for a 3-provider clinic costs ~130 ms of one core per DAY, and its working set is a fraction of one L2 cache, so a decision touches no disk and, once warm, no DRAM. No Arm intrinsics are used — the claim is about the workload being small enough for an efficiency core, not about hand-vectorised code."
+  },
+  "costPerCall": {
+    "usd": 0,
+    "why": "No model inference: deterministic intent match and templated responses, so no tokens and no provider. No network egress at runtime. Local SQLite, so no hosted database. Marginal cost is zero; amortized cost is the device the clinic already owns.",
+    "scope": "Local adapter only. Any qualifying adapter (Bedrock, CockroachDB Cloud, CALL-E) introduces real per-call cost, so this figure is not repeated in those cuts."
+  },
+  "governance": {
+    "suiteSize": 12,
+    "blockedReads": 5,
+    "escalatedToHuman": 1,
+    "fellBackToMenu": 1,
+    "resolvedUnassistedPct": 83,
+    "note": "Numerator excludes both human escalations AND UNKNOWN menu fallbacks — an unrecognised ask was not resolved, and counting it as such would inflate the rate. Refusals DO count as resolutions: declining an SSN and offering the records path is the product working. Denominator is every call reaching a terminal state."
+  },
+  "generatedAt": "2026-08-02T19:24:56.391Z"
+}
