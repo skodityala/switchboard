@@ -1,5 +1,7 @@
 # Switchboard
 
+[![CI](https://github.com/skodityala/switchboard/actions/workflows/ci.yml/badge.svg)](https://github.com/skodityala/switchboard/actions/workflows/ci.yml)
+
 **An AI phone agent for independent clinics that structurally cannot leak patient data.**
 
 Its data access is gated at runtime by a metadata catalog, not by a prompt.
