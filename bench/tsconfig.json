@@ -1,6 +1,24 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "rootDir": ".", "outDir": "dist", "types": ["node"] },
-  "include": ["bench.ts"],
-  "references": [{ "path": "../packages/catalog" }, { "path": "../packages/reasoner" }]
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "bench.ts"
+  ],
+  "references": [
+    {
+      "path": "../packages/catalog"
+    },
+    {
+      "path": "../packages/reasoner"
+    },
+    {
+      "path": "../packages/memory"
+    }
+  ]
 }

@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { arch, platform, cpus, totalmem } from 'node:os';
 import { SqliteCatalog } from '@switchboard/catalog';
+import { SqliteMemory } from '@switchboard/memory';
 import { DeterministicReasoner, INTENT_FIELDS } from '@switchboard/reasoner';
 import type { Intent } from '@switchboard/reasoner';
 
@@ -138,6 +139,57 @@ async function main(): Promise<void> {
     turnMicros.push((performance.now() - t0) * 1000);
   }
 
+  // ── memory recall: gated retrieval over a realistic history ──────────────
+  // Every hit that names a field is re-adjudicated through the catalog, so this
+  // measures retrieval AND the gate, not a bare vector scan.
+  const benchMemory = new SqliteMemory({ catalog });
+  for (let i = 0; i < 200; i++) {
+    await benchMemory.remember({
+      callId: `call_${i % 20}`,
+      subjectId: 'p_1001',
+      kind: i % 3 === 0 ? 'ENTITY' : 'TURN',
+      text: `caller asked about ${['refill','appointment','balance','hours','records'][i % 5]} on visit ${i}`,
+      ...(i % 3 === 0
+        ? { field: { table: 'appointment', field: 'starts_at' }, classification: 'OPERATIONAL' as const }
+        : {}),
+    });
+  }
+  // plus memories that must be withheld on every recall
+  for (let i = 0; i < 20; i++) {
+    await benchMemory.remember({
+      callId: 'call_old', subjectId: 'p_1001', kind: 'ENTITY',
+      text: `social security number reference ${i}`,
+      field: { table: 'patient', field: 'ssn' }, classification: 'SENSITIVE_PII',
+    });
+  }
+  const recallMicros: number[] = [];
+  for (let i = 0; i < 500; i++) {
+    const t0 = performance.now();
+    await benchMemory.recall({
+      subjectId: 'p_1001',
+      text: 'what did I ask about my refill',
+      callId: 'call_bench', channel: 'PHONE', subjectVerified: true, limit: 5,
+    });
+    recallMicros.push((performance.now() - t0) * 1000);
+  }
+  const recallSorted = [...recallMicros].sort((a, b) => a - b);
+  const benignRecall = await benchMemory.recall({
+    subjectId: 'p_1001', text: 'what did I ask about my refill',
+    callId: 'call_bench', channel: 'PHONE', subjectVerified: true, limit: 5,
+  });
+  // A query that DOES target the restricted memories, so the withheld count is
+  // reported against a case where the gate actually has something to refuse.
+  const restrictedRecall = await benchMemory.recall({
+    subjectId: 'p_1001', text: 'social security number',
+    callId: 'call_bench', channel: 'PHONE', subjectVerified: true, limit: 5,
+  });
+  // Cross-caller probe: another caller's id must see none of this history.
+  const foreignRecall = await benchMemory.recall({
+    subjectId: 'p_2002', text: 'what did I ask about my refill',
+    callId: 'call_bench', channel: 'PHONE', subjectVerified: true, limit: 5,
+  });
+  benchMemory.close();
+
   // ── resolved-unassisted over the fixture suite ───────────────────────────
   const suite: ReadonlyArray<{ text: string }> = [
     { text: 'what are your hours?' },
@@ -217,6 +269,21 @@ async function main(): Promise<void> {
       gcForced: typeof gc === 'function',
       note: 'catalogHeapKB is the retained heap attributable to the catalog and its decisions. processRssMB is the whole Node process including the V8 baseline — it is NOT a footprint claim for this software and is recorded only for completeness.',
     },
+    memoryRecall: {
+      corpus: 220,
+      iterations: recallMicros.length,
+      p50Micros: +quantile(recallSorted, 0.5).toFixed(1),
+      p95Micros: +quantile(recallSorted, 0.95).toFixed(1),
+      scannedPerQuery: benignRecall.scanned,
+      benignQuery: { hits: benignRecall.hits.length, withheld: benignRecall.withheld.length },
+      // The number that shows the gate operating on recall.
+      restrictedQuery: {
+        hits: restrictedRecall.hits.length,
+        withheld: restrictedRecall.withheld.length,
+      },
+      crossCallerProbe: { scanned: foreignRecall.scanned, hits: foreignRecall.hits.length },
+      note: 'Scoped recall over one caller\'s history, INCLUDING re-adjudication of every field-bearing hit. The local adapter is a full linear scan of the caller\'s entries with no vector index — that scan is precisely what a distributed vector index replaces in the CockroachDB adapter, so this figure is a ceiling, not a floor. withheld is reported for a query that TARGETS restricted memories; a benign query legitimately withholds nothing.',
+    },
     costPerCall: {
       usd: 0,
       why: 'No model inference: deterministic intent match and templated responses, so no tokens and no provider. No network egress at runtime. Local SQLite, so no hosted database. Marginal cost is zero; amortized cost is the device the clinic already owns.',
@@ -247,6 +314,8 @@ async function main(): Promise<void> {
   console.log(`  decision p99           ${d.p99Micros} µs`);
   console.log(`  deepest walk p95       ${results.deepestLineageWalk.p95Micros} µs  (3 hops)`);
   console.log(`  full turn p95          ${results.fullTurn.p95Micros} µs`);
+  console.log(`  memory recall p95      ${results.memoryRecall.p95Micros} µs  (linear scan of ${results.memoryRecall.scannedPerQuery} entries, no vector index)`);
+  console.log(`  recall gate            ${results.memoryRecall.restrictedQuery.withheld} withheld on a restricted query · ${results.memoryRecall.crossCallerProbe.scanned} scanned for another caller`);
   console.log(`  cold start             ${results.coldStart.millis} ms`);
   console.log(`  catalog heap           ${results.memory.catalogHeapKB} KB`);
   console.log(`  process RSS            ${results.memory.processRssMB} MB  (V8 baseline, not a footprint claim)`);

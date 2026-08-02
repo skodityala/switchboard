@@ -10,33 +10,53 @@
   "catalogDecision": {
     "iterations": 10000,
     "warmupDiscarded": 500,
-    "p50Micros": 77.6,
-    "p95Micros": 95.1,
-    "p99Micros": 109.3,
-    "meanMicros": 83.8,
+    "p50Micros": 82.1,
+    "p95Micros": 100.1,
+    "p99Micros": 113.2,
+    "meanMicros": 89.4,
     "note": "decide() only: classification + full lineage walk + rules + trace. Excludes rendering and speech."
   },
   "deepestLineageWalk": {
     "target": "claim_export.subscriber_key",
     "hops": 3,
     "iterations": 2000,
-    "p95Micros": 106.6,
+    "p95Micros": 111.2,
     "note": "Worst-case chain in the fixture, measured separately from the average."
   },
   "fullTurn": {
     "iterations": 2000,
-    "p95Micros": 102.8,
+    "p95Micros": 106.8,
     "note": "Intent routing + gate + template fill. Still no network, no model call."
   },
   "coldStart": {
-    "millis": 2.2,
+    "millis": 2.14,
     "note": "Schema + fixtures loaded and first decision served, from a cold catalog."
   },
   "memory": {
-    "catalogHeapKB": 12936,
-    "processRssMB": 135.3,
+    "catalogHeapKB": 12464,
+    "processRssMB": 153.7,
     "gcForced": true,
     "note": "catalogHeapKB is the retained heap attributable to the catalog and its decisions. processRssMB is the whole Node process including the V8 baseline — it is NOT a footprint claim for this software and is recorded only for completeness."
+  },
+  "memoryRecall": {
+    "corpus": 220,
+    "iterations": 500,
+    "p50Micros": 831,
+    "p95Micros": 910.6,
+    "scannedPerQuery": 220,
+    "benignQuery": {
+      "hits": 5,
+      "withheld": 0
+    },
+    "restrictedQuery": {
+      "hits": 5,
+      "withheld": 20
+    },
+    "crossCallerProbe": {
+      "scanned": 0,
+      "hits": 0
+    },
+    "note": "Scoped recall over one caller's history, INCLUDING re-adjudication of every field-bearing hit. The local adapter is a full linear scan of the caller's entries with no vector index — that scan is precisely what a distributed vector index replaces in the CockroachDB adapter, so this figure is a ceiling, not a floor. withheld is reported for a query that TARGETS restricted memories; a benign query legitimately withholds nothing."
   },
   "costPerCall": {
     "usd": 0,
@@ -51,5 +71,5 @@
     "resolvedUnassistedPct": 83,
     "note": "Numerator excludes both human escalations AND UNKNOWN menu fallbacks — an unrecognised ask was not resolved, and counting it as such would inflate the rate. Refusals DO count as resolutions: declining an SSN and offering the records path is the product working. Denominator is every call reaching a terminal state."
   },
-  "generatedAt": "2026-08-02T16:23:25.441Z"
+  "generatedAt": "2026-08-02T17:03:58.108Z"
 }

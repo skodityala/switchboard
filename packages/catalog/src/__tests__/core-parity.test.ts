@@ -176,7 +176,10 @@ describe('decision parity — tautological, since both call adjudicate()', () =>
         compared++;
       }
     }
-    expect(compared).toBeGreaterThan(100);
+    // 30 fields (27 catalogued + 3 deliberately unclassified probes) x 4
+    // verification states. Asserted exactly, so adding a field without
+    // extending the parity matrix fails here rather than silently narrowing it.
+    expect(compared).toBe(120);
   });
 });
 
