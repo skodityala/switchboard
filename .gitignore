@@ -10,4 +10,6 @@ dist/
 *.sqlite
 *.sqlite3
 bench/dist/
-console/app.js
+
+# console/app.js is COMMITTED on purpose — see scripts/build-console.mjs.
+# The demo must open from a bare clone with no build step and no toolchain.
