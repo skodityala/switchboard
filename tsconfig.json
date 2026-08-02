@@ -8,6 +8,9 @@
       "path": "packages/reasoner"
     },
     {
+      "path": "packages/memory"
+    },
+    {
       "path": "packages/ui"
     },
     {
