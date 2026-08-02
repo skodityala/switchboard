@@ -415,6 +415,34 @@ setInterval(() => {
     String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 }, 1000);
 
+/**
+ * Warm the gate before the first rendered decision.
+ *
+ * The very first call in a fresh JS context is cold-JIT and measures ~6 ms —
+ * two orders of magnitude above the steady-state p95 of 95 µs that the README
+ * and the video quote. Rendering that number as the hero frame would look like
+ * the benchmark was wrong, so the page discards a warm-up pass first, exactly as
+ * bench/bench.ts discards 500 iterations before measuring.
+ *
+ * The warm-up runs against clinic_info.hours (PUBLIC) so it neither touches a
+ * restricted field nor inflates the blocked-reads counter, and its traces are
+ * thrown away rather than shown.
+ */
+async function warmGate() {
+  for (let i = 0; i < 300; i++) {
+    await catalog.decide({
+      callId: 'warmup',
+      utterance: 'warmup',
+      intent: 'CLINIC_HOURS',
+      requested: { table: 'clinic_info', field: 'hours' },
+      channel: 'PHONE',
+      subjectVerified: true,
+    });
+  }
+  seq = 0; // trace IDs start at tr_000001 for the first decision on screen
+}
+await warmGate();
+
 // Open on the hero moment: the first frame is already a denied prompt injection
 // with a full lineage chain. A plain SSN ask is indistinguishable from a keyword
 // blocklist; this is not, and patient.ssn alone would render an empty chain
