@@ -12,6 +12,13 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const load = (p) => (existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : null);
+
+/** os.cpus() reports 'unknown' on some arm64 Linux images; say so precisely. */
+const cpuLabel = (r) => {
+  const m = r.platform.cpuModel;
+  if (m && m !== 'unknown') return m;
+  return `${r.platform.arch} (model not exposed by /proc/cpuinfo)`;
+};
 const arm = load('bench/results-arm64.json');
 const x86 = load('bench/results-x86_64.json');
 
@@ -68,7 +75,7 @@ the instruction set.
 | | arm64 | x86_64 |
 |---|---|---|
 | Runner | \`ubuntu-24.04-arm\` | \`ubuntu-24.04\` |
-| CPU | ${arm.platform.cpuModel} | ${x86.platform.cpuModel} |
+| CPU | ${cpuLabel(arm)} | ${cpuLabel(x86)} |
 | Cores | ${arm.platform.cpuCount} | ${x86.platform.cpuCount} |
 | Node | ${arm.platform.node} | ${x86.platform.node} |
 | Cache line | ${arm.platform.topology?.cacheLineBytes ?? '?'} B | ${x86.platform.topology?.cacheLineBytes ?? '?'} B |
@@ -94,10 +101,13 @@ flatters its author is the one a judge distrusts.
 These runners are not identical hardware, only identical software. What differs:
 
 - **L2 cache**: arm64 ${(arm.platform.topology?.l2Bytes ?? 0) / 1024} KB vs x86_64 ${(x86.platform.topology?.l2Bytes ?? 0) / 1024} KB. The benchmark's working set is ~10 KB and fits comfortably in both, so cache size is unlikely to explain the gap — but it is a real difference and it is disclosed here rather than omitted.
-- **Different physical CPUs** (${arm.platform.cpuModel} vs ${x86.platform.cpuModel}). This measures *these two runners*, which is what a cloud deployment would actually experience; it is not an ISA-isolated microbenchmark.
+- **Different physical CPUs** (${cpuLabel(arm)} vs ${cpuLabel(x86)}). This measures *these two runners*, which is what a cloud deployment would actually experience; it is not an ISA-isolated microbenchmark.
 - **Shared cloud vCPUs**, so absolute numbers are slower than dedicated hardware on both sides. The ratio is the meaningful figure, not the absolute latency.
 
-${armWins === MEASURES.length ? `**All ${MEASURES.length} measures favour arm64.** A clean sweep deserves scrutiny, so: the smallest measured value is ${Math.round(Math.min(...MEASURES.map(([, g]) => g(arm))) / Math.max(floor * 2, 0.0001))}× the noise threshold, both runs used identical iteration counts and warm-up, and the comparison script reports x86_64 wins when they occur (verified against synthetic inputs where x86_64 wins two measures).` : ''}
+${armWins === MEASURES.length ? `**All ${MEASURES.length} measures favour arm64.** A clean sweep deserves scrutiny, so: the smallest microsecond-scale measurement is ${Math.round(
+        Math.min(...MEASURES.filter(([, , u]) => u === 'µs').map(([, g]) => g(arm))) /
+          Math.max(floor * 2, 0.0001),
+      ).toLocaleString()}× the noise threshold, both runs used identical iteration counts and warm-up, and the comparison script reports x86_64 wins when they occur (verified against synthetic inputs where x86_64 wins two measures).` : ''}
 
 Both raw result files are published as CI artifacts, so every figure here is
 traceable to a specific run and reproducible from this repo.

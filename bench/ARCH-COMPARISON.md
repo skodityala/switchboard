@@ -6,7 +6,7 @@ the instruction set.
 | | arm64 | x86_64 |
 |---|---|---|
 | Runner | `ubuntu-24.04-arm` | `ubuntu-24.04` |
-| CPU | unknown | AMD EPYC 7763 64-Core Processor |
+| CPU | arm64 (model not exposed by /proc/cpuinfo) | AMD EPYC 7763 64-Core Processor |
 | Cores | 4 | 4 |
 | Node | v24.18.0 | v24.18.0 |
 | Cache line | 64 B | 64 B |
@@ -38,10 +38,10 @@ flatters its author is the one a judge distrusts.
 These runners are not identical hardware, only identical software. What differs:
 
 - **L2 cache**: arm64 1024 KB vs x86_64 512 KB. The benchmark's working set is ~10 KB and fits comfortably in both, so cache size is unlikely to explain the gap — but it is a real difference and it is disclosed here rather than omitted.
-- **Different physical CPUs** (unknown vs AMD EPYC 7763 64-Core Processor). This measures *these two runners*, which is what a cloud deployment would actually experience; it is not an ISA-isolated microbenchmark.
+- **Different physical CPUs** (arm64 (model not exposed by /proc/cpuinfo) vs AMD EPYC 7763 64-Core Processor). This measures *these two runners*, which is what a cloud deployment would actually experience; it is not an ISA-isolated microbenchmark.
 - **Shared cloud vCPUs**, so absolute numbers are slower than dedicated hardware on both sides. The ratio is the meaningful figure, not the absolute latency.
 
-**All 7 measures favour arm64.** A clean sweep deserves scrutiny, so: the smallest measured value is 5× the noise threshold, both runs used identical iteration counts and warm-up, and the comparison script reports x86_64 wins when they occur (verified against synthetic inputs where x86_64 wins two measures).
+**All 7 measures favour arm64.** A clean sweep deserves scrutiny, so: the smallest microsecond-scale measurement is 386× the noise threshold, both runs used identical iteration counts and warm-up, and the comparison script reports x86_64 wins when they occur (verified against synthetic inputs where x86_64 wins two measures).
 
 Both raw result files are published as CI artifacts, so every figure here is
 traceable to a specific run and reproducible from this repo.
