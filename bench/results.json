@@ -10,39 +10,39 @@
   "catalogDecision": {
     "iterations": 10000,
     "warmupDiscarded": 500,
-    "p50Micros": 82.1,
-    "p95Micros": 100.1,
-    "p99Micros": 113.2,
-    "meanMicros": 89.4,
+    "p50Micros": 85.3,
+    "p95Micros": 103.5,
+    "p99Micros": 114.6,
+    "meanMicros": 93.7,
     "note": "decide() only: classification + full lineage walk + rules + trace. Excludes rendering and speech."
   },
   "deepestLineageWalk": {
     "target": "claim_export.subscriber_key",
     "hops": 3,
     "iterations": 2000,
-    "p95Micros": 111.2,
+    "p95Micros": 112.6,
     "note": "Worst-case chain in the fixture, measured separately from the average."
   },
   "fullTurn": {
     "iterations": 2000,
-    "p95Micros": 106.8,
+    "p95Micros": 108.6,
     "note": "Intent routing + gate + template fill. Still no network, no model call."
   },
   "coldStart": {
-    "millis": 2.14,
+    "millis": 1.64,
     "note": "Schema + fixtures loaded and first decision served, from a cold catalog."
   },
   "memory": {
-    "catalogHeapKB": 12464,
-    "processRssMB": 153.7,
-    "gcForced": true,
+    "catalogHeapKB": 7373,
+    "processRssMB": 155.4,
+    "gcForced": false,
     "note": "catalogHeapKB is the retained heap attributable to the catalog and its decisions. processRssMB is the whole Node process including the V8 baseline — it is NOT a footprint claim for this software and is recorded only for completeness."
   },
   "memoryRecall": {
     "corpus": 220,
     "iterations": 500,
-    "p50Micros": 831,
-    "p95Micros": 910.6,
+    "p50Micros": 837.3,
+    "p95Micros": 932.7,
     "scannedPerQuery": 220,
     "benignQuery": {
       "hits": 5,
@@ -71,5 +71,5 @@
     "resolvedUnassistedPct": 83,
     "note": "Numerator excludes both human escalations AND UNKNOWN menu fallbacks — an unrecognised ask was not resolved, and counting it as such would inflate the rate. Refusals DO count as resolutions: declining an SSN and offering the records path is the product working. Denominator is every call reaching a terminal state."
   },
-  "generatedAt": "2026-08-02T17:03:58.108Z"
+  "generatedAt": "2026-08-02T17:09:51.498Z"
 }

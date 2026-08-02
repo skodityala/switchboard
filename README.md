@@ -168,7 +168,7 @@ open console/index.html        # the demo — no build, no server, no network
 
 npm install                    # only for tests and benchmarks
 npm run typecheck
-npm test                       # 69 tests
+npm test                       # 69 tests (builds first)
 npm run bench                  # regenerates every number above
 npm run build:console          # rebuilds console/app.js from the compiled cores
 ```

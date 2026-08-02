@@ -5,7 +5,22 @@
     "outDir": "dist",
     "types": [
       "node"
-    ]
+    ],
+    "paths": {
+      "@switchboard/catalog": [
+        "../packages/catalog/src/index.ts"
+      ],
+      "@switchboard/memory": [
+        "../packages/memory/src/index.ts"
+      ],
+      "@switchboard/reasoner": [
+        "../packages/reasoner/src/index.ts"
+      ],
+      "@switchboard/channel": [
+        "../packages/channel/src/index.ts"
+      ]
+    },
+    "baseUrl": "."
   },
   "include": [
     "bench.ts"
