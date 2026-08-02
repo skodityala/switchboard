@@ -13,3 +13,8 @@ bench/dist/
 
 # console/app.js is COMMITTED on purpose — see scripts/build-console.mjs.
 # The demo must open from a bare clone with no build step and no toolchain.
+
+# On-device model: fetched by `npm run fetch:model`, never committed.
+# 22 MB of binary does not belong in a contest repo, and the DEFAULT
+# deterministic path does not need it.
+models/

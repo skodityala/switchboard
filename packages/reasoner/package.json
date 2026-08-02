@@ -14,5 +14,13 @@
   "dependencies": {
     "@switchboard/catalog": "*",
     "@google/genai": "^2.15.0"
+  },
+  "peerDependencies": {
+    "@huggingface/transformers": "^4.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@huggingface/transformers": {
+      "optional": true
+    }
   }
 }
