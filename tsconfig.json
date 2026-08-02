@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/catalog" },
-    { "path": "packages/reasoner" },
-    { "path": "packages/ui" }
+    {
+      "path": "packages/catalog"
+    },
+    {
+      "path": "packages/reasoner"
+    },
+    {
+      "path": "packages/ui"
+    },
+    {
+      "path": "bench"
+    }
   ]
 }

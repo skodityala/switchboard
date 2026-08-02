@@ -5,12 +5,18 @@
   "description": "An AI phone agent for independent clinics that structurally cannot leak patient data. Data access is gated at runtime by a metadata catalog, not by a prompt.",
   "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=22" },
-  "workspaces": ["packages/*"],
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "typecheck": "tsc --build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bench": "tsc --build && node bench/dist/bench.js",
+    "bench:mem": "tsc --build && node --expose-gc bench/dist/bench.js"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

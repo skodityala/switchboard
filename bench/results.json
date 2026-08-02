@@ -1,0 +1,55 @@
+{
+  "platform": {
+    "arch": "arm64",
+    "platform": "darwin",
+    "cpuModel": "Apple M3",
+    "cpuCount": 8,
+    "totalMemGB": 16,
+    "node": "v24.15.0"
+  },
+  "catalogDecision": {
+    "iterations": 10000,
+    "warmupDiscarded": 500,
+    "p50Micros": 77.6,
+    "p95Micros": 95.1,
+    "p99Micros": 109.3,
+    "meanMicros": 83.8,
+    "note": "decide() only: classification + full lineage walk + rules + trace. Excludes rendering and speech."
+  },
+  "deepestLineageWalk": {
+    "target": "claim_export.subscriber_key",
+    "hops": 3,
+    "iterations": 2000,
+    "p95Micros": 106.6,
+    "note": "Worst-case chain in the fixture, measured separately from the average."
+  },
+  "fullTurn": {
+    "iterations": 2000,
+    "p95Micros": 102.8,
+    "note": "Intent routing + gate + template fill. Still no network, no model call."
+  },
+  "coldStart": {
+    "millis": 2.2,
+    "note": "Schema + fixtures loaded and first decision served, from a cold catalog."
+  },
+  "memory": {
+    "catalogHeapKB": 12936,
+    "processRssMB": 135.3,
+    "gcForced": true,
+    "note": "catalogHeapKB is the retained heap attributable to the catalog and its decisions. processRssMB is the whole Node process including the V8 baseline — it is NOT a footprint claim for this software and is recorded only for completeness."
+  },
+  "costPerCall": {
+    "usd": 0,
+    "why": "No model inference: deterministic intent match and templated responses, so no tokens and no provider. No network egress at runtime. Local SQLite, so no hosted database. Marginal cost is zero; amortized cost is the device the clinic already owns.",
+    "scope": "Local adapter only. Any qualifying adapter (Bedrock, CockroachDB Cloud, CALL-E) introduces real per-call cost, so this figure is not repeated in those cuts."
+  },
+  "governance": {
+    "suiteSize": 12,
+    "blockedReads": 5,
+    "escalatedToHuman": 1,
+    "fellBackToMenu": 1,
+    "resolvedUnassistedPct": 83,
+    "note": "Numerator excludes both human escalations AND UNKNOWN menu fallbacks — an unrecognised ask was not resolved, and counting it as such would inflate the rate. Refusals DO count as resolutions: declining an SSN and offering the records path is the product working. Denominator is every call reaching a terminal state."
+  },
+  "generatedAt": "2026-08-02T16:23:25.441Z"
+}

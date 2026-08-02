@@ -9,3 +9,4 @@ dist/
 *.db-journal
 *.sqlite
 *.sqlite3
+bench/dist/
