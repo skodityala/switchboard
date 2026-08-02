@@ -7,7 +7,7 @@
 //   CockroachDB × AWS (≥1 AWS service is mandatory there).
 // Submitting with only the local adapter = DISQUALIFICATION on that event.
 
-import type { AccessTrace, CatalogPort, FieldRef } from '@switchboard/catalog';
+import type { AccessTrace, CatalogPort, Channel, FieldRef } from '@switchboard/catalog';
 
 /**
  * The call surface of an independent clinic. Intents that REQUIRE a field read
@@ -35,7 +35,8 @@ export type Intent =
 export interface Utterance {
   readonly callId: string;
   readonly text: string;
-  readonly channel: 'PHONE' | 'CHAT';
+  /** Where a reply would go. The gate uses it, so it is not decorative. */
+  readonly channel: Channel;
 }
 
 export interface CallState {

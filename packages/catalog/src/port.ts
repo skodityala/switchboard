@@ -79,18 +79,41 @@ export interface AccessTrace {
   /** One human sentence, shown in the panel and spoken by the agent. */
   readonly rationale: string;
   readonly lineage: readonly LineageHop[];
-  readonly channel: 'PHONE' | 'CHAT';
+  readonly channel: Channel;
   readonly subjectVerified: boolean;
   readonly decidedAt: string; // ISO-8601
   readonly durationMicros: number; // catalog decision only, excludes rendering
 }
+
+/**
+ * Where a disclosure would actually go.
+ *
+ * This is not cosmetic. A field's disclosability depends on the channel: an SSN
+ * is never readable aloud on a phone call, and it is equally never sendable in
+ * an email or a Slack message. Naming the channel in the request means the gate
+ * evaluates the same rule for every surface an agent can reach, rather than
+ * having a phone rule and an implicit "everything else is fine".
+ */
+export type Channel =
+  | 'PHONE'
+  | 'CHAT'
+  | 'EMAIL'
+  | 'SLACK'
+  | 'DISCORD'
+  | 'TELEGRAM'
+  | 'SMS'
+  | 'WHATSAPP'
+  | 'X'
+  | 'IMESSAGE'
+  | 'GITHUB'
+  | 'UNKNOWN_CHANNEL';
 
 export interface AccessRequest {
   readonly callId: string;
   readonly utterance: string;
   readonly intent: string;
   readonly requested: FieldRef;
-  readonly channel: 'PHONE' | 'CHAT';
+  readonly channel: Channel;
   readonly subjectVerified: boolean;
   /** Identity of the verified caller, when verified. */
   readonly callerSubjectId?: string;

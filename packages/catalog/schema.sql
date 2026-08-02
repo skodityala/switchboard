@@ -58,7 +58,13 @@ CREATE TABLE access_trace (
   rule                     TEXT NOT NULL,
   rationale                TEXT NOT NULL,
   lineage_json             TEXT NOT NULL DEFAULT '[]',
-  channel                  TEXT NOT NULL CHECK (channel IN ('PHONE','CHAT')),
+  -- Must stay in step with the Channel union in src/port.ts. The constraint is
+  -- deliberately explicit rather than a free-text column: an unrecognised
+  -- channel is a bug, and a bug here means a decision was recorded against a
+  -- surface the gate does not actually reason about.
+  channel                  TEXT NOT NULL CHECK (channel IN (
+                             'PHONE','CHAT','EMAIL','SLACK','DISCORD','TELEGRAM',
+                             'SMS','WHATSAPP','X','IMESSAGE','GITHUB','UNKNOWN_CHANNEL')),
   subject_verified         INTEGER NOT NULL CHECK (subject_verified IN (0,1)),
   decided_at               TEXT NOT NULL,
   duration_micros          INTEGER NOT NULL

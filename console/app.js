@@ -59,15 +59,18 @@ function evaluate(request, declared, effective) {
             rationale: `${key} is not in the catalog. Unclassified fields are denied by default.`,
         };
     }
-    // 2. Never disclosable by phone or chat, at any verification level.
+    // 2. Never disclosable on ANY channel, at any verification level. The rule id
+    // retains its original name for trace-log compatibility, but the rationale
+    // names the actual channel so a Slack denial does not read "by phone".
     if (NEVER_DISCLOSABLE.has(effective)) {
         const inherited = effective !== declared;
+        const where = request.channel === 'PHONE' ? 'by phone' : `over ${request.channel.toLowerCase()}`;
         return {
             decision: 'DENY',
             rule: 'RULE_NEVER_BY_PHONE',
             rationale: inherited
-                ? `${key} is classified ${declared}, but inherits ${effective} through lineage. Never disclosable by phone.`
-                : `${key} is ${effective}. Never disclosable by phone under any verification.`,
+                ? `${key} is classified ${declared}, but inherits ${effective} through lineage. Never disclosable ${where}.`
+                : `${key} is ${effective}. Never disclosable ${where} under any verification.`,
         };
     }
     // 3. PII requires a verified data subject, and the subject must be the caller.
