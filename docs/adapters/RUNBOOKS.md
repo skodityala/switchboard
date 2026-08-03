@@ -94,3 +94,4 @@ Two npm name collisions were caught here. Either would have installed cleanly, t
 Both avoided. DataHub is integrated via its GraphQL API; CALL-E via REST behind an interface. `pg` was verified as node-postgres, which Cockroach Labs documents.
 
 **Standing rule: confirm a package's `homepage`/`repository` points at the sponsor's actual product before building against it.**
+
