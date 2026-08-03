@@ -21,8 +21,8 @@
 // Not committed — 21 MB of binary does not belong in a contest repo — but
 // fetched once by an explicit command, after which the path is fully offline.
 
-import type { AccessTrace, CatalogPort, FieldRef } from '@switchboard/catalog';
-import { INTENT_FIELDS } from '../deterministic.js';
+import type { CatalogPort } from '@switchboard/catalog';
+import { runTurn, INTENT_FIELDS } from '../turn.js';
 import type { CallState, Intent, ReasonerPort, Turn, Utterance } from '../port.js';
 
 /** Structural declaration of the transformers.js surface this adapter uses. */
@@ -178,7 +178,7 @@ export class OnDeviceReasoner implements ReasonerPort {
   }
 
   async respond(utterance: Utterance, state: CallState, catalog: CatalogPort): Promise<Turn> {
-    const started = performance.now();
+    const started = performance.now() * 1000;
 
     let intent: Intent;
     try {
@@ -190,85 +190,7 @@ export class OnDeviceReasoner implements ReasonerPort {
     }
     this.lastIntent = intent;
 
-    // IDENTICAL from here to both other reasoners. The model proposed; the
-    // catalog decides. INTENT_FIELDS is static, so the reachable field set is
-    // auditable by reading one table regardless of what the model inferred.
-    const fields: readonly FieldRef[] = INTENT_FIELDS[intent];
-    const traces: AccessTrace[] = [];
-    let denied = false;
-
-    for (const requested of fields) {
-      const trace = await catalog.decide({
-        callId: utterance.callId,
-        utterance: utterance.text,
-        intent,
-        requested,
-        channel: utterance.channel,
-        subjectVerified: state.subjectVerified,
-        ...(state.callerSubjectId !== undefined ? { callerSubjectId: state.callerSubjectId } : {}),
-        ...(state.rowSubjectId !== undefined ? { rowSubjectId: state.rowSubjectId } : {}),
-      });
-      traces.push(trace);
-      if (trace.decision === 'DENY') denied = true;
-    }
-
-    let reply: string;
-    let escalated = false;
-
-    if (denied) {
-      const first = traces.find((t) => t.decision === 'DENY') as AccessTrace;
-      const secure =
-        first.effectiveClassification === 'PHI' ||
-        first.requested.table === 'patient' ||
-        first.requested.table === 'claim';
-      reply =
-        `I don't have access to that field.` +
-        (secure
-          ? ` If you need it, I can start a records request that goes out by secure mail or in person.`
-          : ` I can help with hours, appointments, refills or billing instead.`);
-    } else {
-      const reader = catalog as unknown as {
-        readValue?: (t: AccessTrace, subjectId: string) => string | undefined;
-      };
-      let filled = TEMPLATES[intent] ?? TEMPLATES.UNKNOWN;
-      if (typeof reader.readValue === 'function') {
-        for (const t of traces) {
-          if (t.decision !== 'ALLOW') continue;
-          const v = reader.readValue(t, state.rowSubjectId ?? '*');
-          if (v !== undefined) filled = filled.replaceAll(`{${t.requested.field}}`, v);
-        }
-      }
-      reply = /\{[a-z_]+\}/.test(filled) ? TEMPLATES.UNKNOWN : filled;
-      if (intent === 'RECORDS_REQUEST') escalated = true;
-    }
-
-    return {
-      reply,
-      intent,
-      traces,
-      resolvedUnassisted: !escalated,
-      escalatedToHuman: escalated,
-      latencyMicros: Math.round((performance.now() - started) * 1000),
-    };
+    return runTurn(utterance, state, catalog, intent, started);
   }
 }
 
-const TEMPLATES: Readonly<Record<Intent, string>> = {
-  CLINIC_HOURS: 'We are open {hours}.',
-  CLINIC_ADDRESS: 'We are at {address}.',
-  APPOINTMENT_WHEN: 'Your next appointment is {starts_at} with {provider_name}.',
-  APPOINTMENT_REASON: '',
-  REFILL_STATUS: 'Your refill is {refill_status}.',
-  REFILL_DRUG_NAME: '',
-  BALANCE_DUE: 'Your balance is {balance_cents}.',
-  RECORDS_REQUEST:
-    'I can start a records request. Records are released in person or by secure mail, never read out over the phone.',
-  IDENTITY_CONFIRM: 'I can start verification. What is the date of birth on the account?',
-  ASK_SSN: '',
-  ASK_SUBSCRIBER_KEY: '',
-  ASK_SSN_LAST4: '',
-  ASK_INSURANCE_ID: '',
-  ASK_HOME_ADDRESS: '',
-  ASK_DIAGNOSIS: '',
-  UNKNOWN: 'I can help with hours, appointments, refills and billing. Which would you like?',
-};

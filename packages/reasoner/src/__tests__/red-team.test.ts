@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SqliteCatalog } from '@switchboard/catalog';
-import { DeterministicReasoner, INTENT_FIELDS } from '../deterministic.js';
+import { DeterministicReasoner } from '../deterministic.js';
+import { INTENT_FIELDS } from '../turn.js';
 import type { CallState } from '../port.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

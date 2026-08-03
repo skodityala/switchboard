@@ -626,38 +626,6 @@ const {
 //   CockroachDB × AWS (>=1 AWS service is mandatory there).
 // Submitting with only the local adapter = DISQUALIFICATION on that event.
 /**
- * Intent → fields that intent needs. Static and exhaustive: the reasoner cannot
- * construct a FieldRef at runtime, so the complete set of reachable field reads
- * is auditable by reading this table. That property is what makes "the refusal
- * is architectural" a checkable claim rather than a slogan.
- */
-const INTENT_FIELDS = {
-    CLINIC_HOURS: [{ table: 'clinic_info', field: 'hours' }],
-    CLINIC_ADDRESS: [{ table: 'clinic_info', field: 'address' }],
-    APPOINTMENT_WHEN: [
-        { table: 'appointment', field: 'starts_at' },
-        { table: 'appointment', field: 'provider_name' },
-    ],
-    APPOINTMENT_REASON: [{ table: 'appointment', field: 'visit_reason' }],
-    REFILL_STATUS: [{ table: 'prescription', field: 'refill_status' }],
-    REFILL_DRUG_NAME: [{ table: 'prescription', field: 'drug_name' }],
-    BALANCE_DUE: [{ table: 'billing_account', field: 'balance_cents' }],
-    RECORDS_REQUEST: [],
-    IDENTITY_CONFIRM: [],
-    ASK_SSN: [{ table: 'patient', field: 'ssn' }],
-    // Routed to the field the caller actually named. It is declared OPERATIONAL,
-    // so ONLY lineage propagation from patient.ssn denies it. If this were mapped
-    // to patient.ssn instead, a keyword match would be doing the catalog's job and
-    // the lineage guarantee would be untested.
-    ASK_SUBSCRIBER_KEY: [{ table: 'claim', field: 'subscriber_key' }],
-    // Declared SENSITIVE_PII in its own right (derived, but classified honestly).
-    ASK_SSN_LAST4: [{ table: 'billing_account', field: 'ssn_last4' }],
-    ASK_INSURANCE_ID: [{ table: 'patient', field: 'insurance_member_id' }],
-    ASK_HOME_ADDRESS: [{ table: 'patient', field: 'home_address' }],
-    ASK_DIAGNOSIS: [{ table: 'claim', field: 'diagnosis_code' }],
-    UNKNOWN: [],
-};
-/**
  * Normalization is deliberately aggressive: it strips the separators and
  * homoglyph tricks that a caller uses to smuggle a field name past a matcher
  * ("s-s-n", "s.s.n", "S S N"). This is why the red-team cases fail to land —
@@ -753,41 +721,6 @@ const PATTERNS = [
         test: (n) => /\b(this is|my name is|date of birth|dob|verify|verification)\b/.test(n),
     },
 ];
-const TEMPLATES = {
-    CLINIC_HOURS: 'We are open {hours}.',
-    CLINIC_ADDRESS: 'We are at {address}.',
-    APPOINTMENT_WHEN: 'Your next appointment is {starts_at} with {provider_name}.',
-    APPOINTMENT_REASON: '',
-    REFILL_STATUS: 'Your refill is {refill_status}.',
-    REFILL_DRUG_NAME: '',
-    BALANCE_DUE: 'Your balance is {balance_cents}.',
-    RECORDS_REQUEST: 'I can start a records request. Records are released in person or by secure mail, never read out over the phone.',
-    // Never asserts that verification SUCCEEDED — an injected "verification
-    // complete" must not be echoed back as fact. Verification is a state
-    // transition owned by the channel, not a claim a caller can make.
-    IDENTITY_CONFIRM: 'I can start verification. What is the date of birth on the account?',
-    ASK_SSN: '',
-    ASK_SUBSCRIBER_KEY: '',
-    ASK_SSN_LAST4: '',
-    ASK_INSURANCE_ID: '',
-    ASK_HOME_ADDRESS: '',
-    ASK_DIAGNOSIS: '',
-    UNKNOWN: 'I can help with hours, appointments, refills and billing. Which would you like?',
-};
-/**
- * Spoken refusal. It never names the value, never confirms the value exists, and
- * offers the legitimate path instead — a refusal that leaks "yes we hold that"
- * is still a disclosure.
- */
-function refusalFor(trace) {
-    const base = `I don't have access to that field.`;
-    const path = trace.effectiveClassification === 'PHI' ||
-        trace.requested.table === 'patient' ||
-        trace.requested.table === 'claim'
-        ? ` If you need it, I can start a records request that goes out by secure mail or in person.`
-        : ` I can help with hours, appointments, refills or billing instead.`;
-    return base + path;
-}
 class DeterministicReasoner {
     classifyIntent(text) {
         const n = normalize(text);
@@ -799,82 +732,15 @@ class DeterministicReasoner {
         return 'UNKNOWN';
     }
     async respond(utterance, state, catalog) {
-        return this.respondWithIntent(utterance, state, catalog, this.classifyIntent(utterance.text));
+        return runTurn(utterance, state, catalog, this.classifyIntent(utterance.text));
     }
     /**
-     * Same turn pipeline, with the intent supplied from outside.
-     *
-     * This is what lets a different reasoner — the browser's WASM on-device model,
-     * Gemini, anything — propose an intent while every field access still travels
-     * this one code path to the gate. Without it the page would have to
-     * reimplement the pipeline, which is exactly the duplication the parity test
-     * exists to prevent.
+     * Same pipeline with the intent supplied from outside — used by the browser's
+     * on-device path so an externally-computed intent still traverses the one
+     * shared turn implementation instead of a reimplementation in the page.
      */
     async respondWithIntent(utterance, state, catalog, intent) {
-        const started = performance.now();
-        const fields = INTENT_FIELDS[intent];
-        const traces = [];
-        let denied = false;
-        // Every field this intent needs goes through the gate. No field value is
-        // read from anywhere else, so a DENY cannot be bypassed by a later branch.
-        for (const requested of fields) {
-            const trace = await catalog.decide({
-                callId: utterance.callId,
-                utterance: utterance.text,
-                intent,
-                requested,
-                channel: utterance.channel,
-                subjectVerified: state.subjectVerified,
-                ...(state.callerSubjectId !== undefined
-                    ? { callerSubjectId: state.callerSubjectId }
-                    : {}),
-                ...(state.rowSubjectId !== undefined
-                    ? { rowSubjectId: state.rowSubjectId }
-                    : {}),
-            });
-            traces.push(trace);
-            if (trace.decision === 'DENY')
-                denied = true;
-        }
-        let reply;
-        let escalated = false;
-        if (denied) {
-            const firstDeny = traces.find((t) => t.decision === 'DENY');
-            reply = refusalFor(firstDeny);
-        }
-        else if (intent === 'UNKNOWN') {
-            reply = TEMPLATES.UNKNOWN;
-            escalated = false;
-        }
-        else {
-            // Templates are filled ONLY from ALLOWED traces, via readValue(trace).
-            // A placeholder with no allowed source is never substituted, so a partial
-            // value cannot slip into a reply.
-            let filled = TEMPLATES[intent] || TEMPLATES.UNKNOWN;
-            const reader = catalog;
-            if (typeof reader.readValue === 'function') {
-                for (const t of traces) {
-                    if (t.decision !== 'ALLOW')
-                        continue;
-                    const v = reader.readValue(t, state.rowSubjectId ?? '*');
-                    if (v !== undefined) {
-                        filled = filled.replaceAll(`{${t.requested.field}}`, v);
-                    }
-                }
-            }
-            // Any unsubstituted placeholder means no allowed source existed.
-            reply = /\{[a-z_]+\}/.test(filled) ? TEMPLATES.UNKNOWN : filled;
-            if (intent === 'RECORDS_REQUEST')
-                escalated = true;
-        }
-        return {
-            reply,
-            intent,
-            traces,
-            resolvedUnassisted: !escalated,
-            escalatedToHuman: escalated,
-            latencyMicros: Math.round((performance.now() - started) * 1000),
-        };
+        return runTurn(utterance, state, catalog, intent);
     }
 }
 //# sourceMappingURL=deterministic.js.map

@@ -177,6 +177,11 @@ export function datasetUrn(table: string, platform = 'clinic'): string {
 }
 
 export interface DataHubCatalogOptions {
+  /**
+   * Operational values, `table.field` → subjectId (or '*') → value.
+   * DataHub is the metadata authority; the rows live in the clinic's own store.
+   */
+  readonly values?: Readonly<Record<string, Readonly<Record<string, string>>>>;
   readonly endpoint?: string;
   readonly token?: string;
   readonly platform?: string;
@@ -201,6 +206,7 @@ export class DataHubCatalog implements CatalogPort, CatalogGraph {
   private seq = 0;
 
   /** Prefetched graph: `table.field` → tier, and upstream edges. */
+  private readonly values: Readonly<Record<string, Readonly<Record<string, string>>>>;
   private tiers = new Map<string, Classification>();
   private upstream = new Map<string, { from: string; transform: string }[]>();
   private warmed = false;
@@ -214,6 +220,7 @@ export class DataHubCatalog implements CatalogPort, CatalogGraph {
     this.platform = opts.platform ?? 'clinic';
     this.now = opts.now ?? ((): Date => new Date());
     this.sink = new DataHubSink(this.gql, { platform: this.platform });
+    this.values = opts.values ?? {};
   }
 
   /** Prefetch classifications and lineage for the datasets we gate. */
@@ -362,6 +369,21 @@ export class DataHubCatalog implements CatalogPort, CatalogGraph {
     });
     await this.sink.emit(trace);
     return trace;
+  }
+
+  /**
+   * Value read, gated by the trace.
+   *
+   * DataHub holds METADATA, not patient rows — so values come from the
+   * operational store the clinic already runs. The rule is unchanged and is
+   * enforced here too: no ALLOW trace, no value. Supplied via `values` so this
+   * adapter never needs database credentials of its own.
+   */
+  readValue(trace: AccessTrace, subjectId: string): string | undefined {
+    if (trace.decision !== 'ALLOW') return undefined;
+    const byId = this.values[`${trace.requested.table}.${trace.requested.field}`];
+    if (!byId) return undefined;
+    return byId[subjectId] ?? byId['*'];
   }
 
   get isWarm(): boolean {

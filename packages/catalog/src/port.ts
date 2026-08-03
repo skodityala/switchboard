@@ -131,7 +131,24 @@ export interface MetadataSink {
   emit(trace: AccessTrace): Promise<void>;
 }
 
-export interface CatalogPort {
+/**
+ * The capability that makes the product's central claim structural.
+ *
+ * It takes an AccessTrace, NOT a FieldRef, and must return undefined unless that
+ * trace is an ALLOW for the same field. There is deliberately no overload taking
+ * a bare field reference: that absence is what prevents a caller from obtaining
+ * a value without first passing the gate.
+ *
+ * This lives ON CatalogPort rather than on a concrete adapter because it was
+ * previously reachable only via `as unknown as` casts — which let the DataHub
+ * adapter ship without it and silently degrade every allowed read to the
+ * fallback menu. On the contract, omission is a compile error.
+ */
+export interface ValueReader {
+  readValue(trace: AccessTrace, subjectId: string): string | undefined;
+}
+
+export interface CatalogPort extends ValueReader {
   /**
    * The single gate. Every field read in the product goes through this call —
    * there is no bypass, no cache, no debug helper that reads a field without a
