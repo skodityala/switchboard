@@ -1,7 +1,7 @@
 # Switchboard
 
 [![CI](https://github.com/skodityala/switchboard/actions/workflows/ci.yml/badge.svg)](https://github.com/skodityala/switchboard/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-%20passing-3DD68C)
+![tests](https://img.shields.io/badge/tests-294%20passing-3DD68C)
 ![deps](https://img.shields.io/badge/runtime%20deps-0-5B8DEF)
 ![bundle](https://img.shields.io/badge/browser%20bundle-35%20KB-5B8DEF)
 ![arch](https://img.shields.io/badge/arm64%20%2B%20x86__64-CI%20verified-F5A524)
@@ -189,7 +189,7 @@ Full table + both raw JSONs: [`bench/ARCH-COMPARISON.md`](bench/ARCH-COMPARISON.
 
 ---
 
-## Test coverage —  tests, 24 files
+## Test coverage — 294 tests, 24 files
 
 ```
   red-team              ████████████████████  20   10 adversarial phrasings + injection
@@ -385,7 +385,7 @@ git clone https://github.com/skodityala/switchboard && cd switchboard
 open console/index.html          # the demo. no build, no server, no network, no key
 
 npm install                      # dev tooling only — 0 runtime dependencies
-npm test                         #  tests
+npm test                         # 294 tests
 npm run bench                    # regenerates every number above
 npm run check:numbers            # fails if a withdrawn figure reappears
 npm run build:console            # rebuild app.js from the compiled cores
@@ -399,7 +399,7 @@ Requires Node ≥ 22 for the `node:sqlite` builtin (measured on v24.15.0, unflag
 
 ### Optional adapter dependencies
 
-Nothing below is installed by default. **`npm install` pulls zero external runtime packages**, and all  tests pass with none present.
+Nothing below is installed by default. **`npm install` pulls zero external runtime packages**, and all 294 tests pass with none present.
 
 ```
   core            0 runtime deps ─────────────────────────── always

@@ -22,7 +22,8 @@
     "fetch:model": "node scripts/fetch-model.mjs",
     "install:ondevice": "npm install --no-save @huggingface/transformers@^4.2.0",
     "sync:numbers": "node scripts/sync-numbers.mjs",
-    "numbers": "npm run sync:numbers && npm run check:numbers"
+    "numbers": "npm run sync:numbers && npm run sync:tests && npm run check:numbers",
+    "sync:tests": "node scripts/sync-test-count.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
