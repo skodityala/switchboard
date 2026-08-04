@@ -19,8 +19,7 @@
       "@switchboard/channel": [
         "../packages/channel/src/index.ts"
       ]
-    },
-    "baseUrl": "."
+    }
   },
   "include": [
     "bench.ts"
