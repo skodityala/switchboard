@@ -1,7 +1,7 @@
 # Switchboard
 
 [![CI](https://github.com/skodityala/switchboard/actions/workflows/ci.yml/badge.svg)](https://github.com/skodityala/switchboard/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-188%20passing-3DD68C)
+![tests](https://img.shields.io/badge/tests-205%20passing-3DD68C)
 ![deps](https://img.shields.io/badge/runtime%20deps-0-5B8DEF)
 ![bundle](https://img.shields.io/badge/browser%20bundle-35%20KB-5B8DEF)
 ![arch](https://img.shields.io/badge/arm64%20%2B%20x86__64-CI%20verified-F5A524)
@@ -12,6 +12,7 @@
 Its data access is gated at runtime by a metadata catalog, not by a prompt.
 
 **▶ Live demo (no install): <https://skodityala.github.io/switchboard/console/index.html>**
+**▶ Product page: <https://skodityala.github.io/switchboard/>** — buyer, pricing, unit economics
 
 ---
 
@@ -188,7 +189,7 @@ Full table + both raw JSONs: [`bench/ARCH-COMPARISON.md`](bench/ARCH-COMPARISON.
 
 ---
 
-## Test coverage — 188 tests, 15 files
+## Test coverage — 205 tests, 16 files
 
 ```
   red-team              ████████████████████  20   10 adversarial phrasings + injection
@@ -357,6 +358,7 @@ switchboard/
 │   │   ├── src/local-channel.ts    speechSynthesis
 │   │   └── src/adapters/           calle.ts · caspian.ts
 │   └── ui/src/tokens.ts            design tokens (committed before components)
+├── index.html                      product page — buyer, pricing, economics
 ├── console/
 │   ├── index.html                  the demo — zero deps, zero network
 │   └── app.js                      GENERATED from compiled cores
@@ -383,7 +385,7 @@ git clone https://github.com/skodityala/switchboard && cd switchboard
 open console/index.html          # the demo. no build, no server, no network, no key
 
 npm install                      # dev tooling only — 0 runtime dependencies
-npm test                         # 188 tests
+npm test                         # 205 tests
 npm run bench                    # regenerates every number above
 npm run check:numbers            # fails if a withdrawn figure reappears
 npm run build:console            # rebuild app.js from the compiled cores
@@ -397,7 +399,7 @@ Requires Node ≥ 22 for the `node:sqlite` builtin (measured on v24.15.0, unflag
 
 ### Optional adapter dependencies
 
-Nothing below is installed by default. **`npm install` pulls zero external runtime packages**, and all 188 tests pass with none present.
+Nothing below is installed by default. **`npm install` pulls zero external runtime packages**, and all 205 tests pass with none present.
 
 ```
   core            0 runtime deps ─────────────────────────── always

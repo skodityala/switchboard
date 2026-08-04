@@ -11,8 +11,13 @@ import { join } from 'node:path';
 const r = JSON.parse(readFileSync('bench/results.json', 'utf8'));
 let bad = 0;
 
-const docs = ['README.md', ...readdirSync('docs/submissions').map((f) => join('docs/submissions', f))]
-  .filter((f) => f.endsWith('.md'));
+const docs = [
+  'README.md',
+  // The landing page quotes measured figures too, so it is checked for stale
+  // numbers exactly like the prose docs.
+  'index.html',
+  ...readdirSync('docs/submissions').map((f) => join('docs/submissions', f)),
+].filter((f) => f.endsWith('.md') || f.endsWith('.html'));
 
 // Figures that must appear verbatim wherever they appear at all.
 const live = {
