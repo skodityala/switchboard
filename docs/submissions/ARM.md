@@ -148,7 +148,7 @@ open console/index.html      # or run it locally — no npm, no server, no key
 
 The deterministic path loads instantly and works offline. **One button** loads the on-device model (37 MB, measured: 0.4 MB runtime ESM + 12.9 MB ONNX-runtime WASM binary + 23.7 MB int8 model) and inference moves in-tab. The active reasoner and its live latency are displayed, so the switch is visible rather than described.
 
-For developers: `npm test` (105 tests), `npm run bench` regenerates every number above, `npm run check:numbers` fails if any withdrawn figure reappears in prose.
+For developers: `npm test` (294 tests), `npm run bench` regenerates every number above, `npm run check:numbers` fails if any withdrawn figure reappears in prose.
 
 ---
 
@@ -158,7 +158,7 @@ For developers: `npm test` (105 tests), `npm run bench` regenerates every number
 - **23.7 MB** int8 model, **37 MB** total first load, opt-in.
 - **$0/call and offline** describe the deterministic default *and* the on-device path after first load.
 
-**Footnote, disclosed rather than buried:** the *Node* on-device path pulls `@huggingface/transformers`, which brings `onnxruntime-node` transitively — **380 MB installed**. It is an **optional peer dependency**: `npm install` does not fetch it, typecheck and all 105 tests pass without it, and the browser path never touches it (the web build has zero `onnxruntime-node` imports). The default product is 40 KB with zero dependencies; the 380 MB is one opt-in developer path.
+**Footnote, disclosed rather than buried:** the *Node* on-device path pulls `@huggingface/transformers`, which brings `onnxruntime-node` transitively — **380 MB installed**. It is an **optional peer dependency**: `npm install` does not fetch it, typecheck and all 294 tests pass without it, and the browser path never touches it (the web build has zero `onnxruntime-node` imports). The default product is 40 KB with zero dependencies; the 380 MB is one opt-in developer path.
 
 **The deterministic reasoner performs no inference, and this submission does not claim otherwise.** Track 3's requirement is carried by the on-device tier. The progression is the point: with no model it is free and instant; with a model it is still offline; with a *hostile* model it still cannot leak.
 

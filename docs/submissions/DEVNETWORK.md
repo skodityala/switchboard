@@ -38,7 +38,7 @@ Working end to end, offline, from a bare clone:
 - Catalog-gated field reads with a full policy trace per decision — **p95 102.4 µs**
 - Per-caller memory that is *itself* gated: a remembered restricted field is re-adjudicated on recall and withheld, and cross-caller recall is not expressible in the interface
 - Live instrumentation: PII reads blocked, % resolved unassisted, latency p95, cost/call
-- **69 tests**, CI on arm64, benchmarks that regenerate from a clean clone
+- **294 tests**, CI on arm64, benchmarks that regenerate from a clean clone
 - A free-text box in the demo running the same compiled gate the tests run — a judge can attack it directly
 
 Four ports with local adapters and documented swap paths for DataHub, CockroachDB, AWS Bedrock and CALL-E.

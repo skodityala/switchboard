@@ -59,7 +59,7 @@ The **live policy denial with its lineage trace**, then the audit table it wrote
 >
 > **Scalable.** p95 policy decision 102.4 µs, 9,764 decisions/sec/core; a 3-provider clinic's entire enforcement layer is ~141 ms of one core per day. The local adapter's recall is a linear scan (p95 923 µs over 220 entries) — that scan is precisely what the distributed vector index replaces, and we report it as a ceiling rather than a strength.
 >
-> 69 tests, CI, 120 decision-parity assertions across every catalog field × four verification states.
+> 294 tests, CI, 120 decision-parity assertions across every catalog field × four verification states.
 
 ### Judge simulation
 | Criterion | Score |
@@ -184,7 +184,7 @@ The **single-core architecture**: `core.ts`, then the console importing the same
 >
 > Restriction propagates along field-level lineage, so a column an operator classified `OPERATIONAL` is still refused when it derives from a social security number three hops upstream. An unclassified field is denied by default. A value cannot be read without an allow decision, because the read function takes a *trace*, not a field reference.
 >
-> 69 tests · zero runtime dependencies · p95 decision 102.4 µs on arm64 · $0 per call · runs offline from a bare clone.
+> 294 tests · zero runtime dependencies · p95 decision 102.4 µs on arm64 · $0 per call · runs offline from a bare clone.
 
 ### Judge simulation
 **Weakest criterion:** presentation — the substance is architectural and hard to make visual in a keynote format.
