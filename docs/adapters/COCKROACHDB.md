@@ -102,6 +102,16 @@ export class CockroachMemory implements MemoryPort, MemoryStore {
 
 Vectors come from `embed(text)` in `core.ts` — hashed lexical, deterministic, no model. **Keep using it.** If you substitute a hosted embedding model, the offline demo and the $0-per-call claim both break, and both are load-bearing at other events in this portfolio.
 
+## Validated against a real cluster
+
+The adapter has been run against real CockroachDB v25.2 locally — 45/45 memory
+tests pass live, and three defects only a real cluster could catch are fixed
+(vector-index feature gate, persistent-table ID collisions, and a vector index
+the planner never used until `subject_id` became a prefix column). Numbers,
+the EXPLAIN plan, and the reproduction commands: 
+[`docs/evidence/cockroachdb/local-validation.md`](../evidence/cockroachdb/local-validation.md).
+The cloud swap is a `CRDB_URL` change.
+
 ## Running the tests against your adapter
 
 The suite is written against the interface. Point it at your adapter:
