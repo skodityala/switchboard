@@ -16,6 +16,8 @@ const docs = [
   // The landing page quotes measured figures too, so it is checked for stale
   // numbers exactly like the prose docs.
   'index.html',
+  // Quotes measured figures a human will paste into forms.
+  'docs/WIN-PLAYBOOK.md',
   ...readdirSync('docs/submissions').map((f) => join('docs/submissions', f)),
 ].filter((f) => f.endsWith('.md') || f.endsWith('.html'));
 
