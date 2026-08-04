@@ -20,7 +20,9 @@
     "build:console": "tsc --build && node scripts/build-console.mjs",
     "check:numbers": "node scripts/check-numbers.mjs",
     "fetch:model": "node scripts/fetch-model.mjs",
-    "install:ondevice": "npm install --no-save @huggingface/transformers@^4.2.0"
+    "install:ondevice": "npm install --no-save @huggingface/transformers@^4.2.0",
+    "sync:numbers": "node scripts/sync-numbers.mjs",
+    "numbers": "npm run sync:numbers && npm run check:numbers"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -44,13 +44,13 @@ That description is this project literally: a quantized transformer running in-b
 
 | Metric | Value | Method |
 |---|---|---|
-| Decision p50 / **p95** / p99 | 86.3 / **105.2** / 123.1 µs | 10,000 iterations, 500 warm-up discarded |
-| Deepest lineage walk p95 | 112.2 µs | 3-hop worst case, measured separately |
-| Throughput | **9,505 decisions/sec/core** | 1 / p95 |
-| **Clinic duty cycle** | **126 ms of one core per day** | 200 calls × 6 field reads |
+| Decision p50 / **p95** / p99 | 91.3 / **117.8** / 273.3 µs | 10,000 iterations, 500 warm-up discarded |
+| Deepest lineage walk p95 | 124.3 µs | 3-hop worst case, measured separately |
+| Throughput | **8,490 decisions/sec/core** | 1 / p95 |
+| **Clinic duty cycle** | **141 ms of one core per day** | 200 calls × 6 field reads |
 | **Working set** | **10,339 B = 0.25% of L2** | vs `hw.l2cachesize` |
 
-Decision p95 is **2,505× the measured timer noise floor** (0.042 µs), so it is not a resolution artifact.
+Decision p95 is **1,419× the measured timer noise floor** (0.083 µs), so it is not a resolution artifact.
 
 ### arm64 vs x86_64 — measured by CI, not self-reported
 

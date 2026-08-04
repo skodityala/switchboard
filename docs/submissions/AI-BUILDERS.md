@@ -89,7 +89,7 @@ Runs entirely on-device: no cloud account, no API key, no data egress. Patient d
 
 ### Technical implementation
 
-105 tests · CI green on **both arm64 and x86_64** · 120 decision-parity assertions · p95 policy decision **~102 µs** · the entire enforcement layer for a 3-provider clinic costs **~123 ms of one CPU core per day** · 40 KB core bundle with zero runtime dependencies · every benchmark regenerates from a clean clone.
+105 tests · CI green on **both arm64 and x86_64** · 120 decision-parity assertions · p95 policy decision **~117.8 µs** · the entire enforcement layer for a 3-provider clinic costs **~141 ms of one core per day** · 40 KB core bundle with zero runtime dependencies · every benchmark regenerates from a clean clone.
 
 ### Numbers we withdrew
 

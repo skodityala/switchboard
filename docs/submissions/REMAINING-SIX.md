@@ -57,7 +57,7 @@ The **live policy denial with its lineage trace**, then the audit table it wrote
 >
 > **Memory is gated by two independent guards.** *Scope:* the only read primitive takes a required `subjectId`, so cross-caller recall is not a permission that can be granted — it is an operation the interface cannot express. Asking as caller A with caller B's exact words scans only A's rows (measured: 0 entries scanned for a foreign subject). *Re-adjudication at read time:* a memory naming a catalog field goes back through the gate on recall, so a memory of `claim.subscriber_key` written while it was `OPERATIONAL` is withheld as `SENSITIVE_PII` once lineage is walked. Measured: 20 memories withheld on a restricted query. Withheld results carry the rule but no text.
 >
-> **Scalable.** p95 policy decision 102.4 µs, 9,764 decisions/sec/core; a 3-provider clinic's entire enforcement layer is ~123 ms of one core per day. The local adapter's recall is a linear scan (p95 923 µs over 220 entries) — that scan is precisely what the distributed vector index replaces, and we report it as a ceiling rather than a strength.
+> **Scalable.** p95 policy decision 102.4 µs, 9,764 decisions/sec/core; a 3-provider clinic's entire enforcement layer is ~141 ms of one core per day. The local adapter's recall is a linear scan (p95 923 µs over 220 entries) — that scan is precisely what the distributed vector index replaces, and we report it as a ceiling rather than a strength.
 >
 > 69 tests, CI, 120 decision-parity assertions across every catalog field × four verification states.
 

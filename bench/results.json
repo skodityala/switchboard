@@ -19,36 +19,36 @@
   },
   "timerNoiseFloorMicros": {
     "p50": 0.042,
-    "p95": 0.042
+    "p95": 0.083
   },
   "catalogDecision": {
     "iterations": 10000,
     "warmupDiscarded": 500,
-    "p50Micros": 86.3,
-    "p95Micros": 105.2,
-    "p99Micros": 123.1,
-    "meanMicros": 94.3,
+    "p50Micros": 91.3,
+    "p95Micros": 117.8,
+    "p99Micros": 273.3,
+    "meanMicros": 103.9,
     "note": "decide() only: classification + full lineage walk + rules + trace. Excludes rendering and speech."
   },
   "deepestLineageWalk": {
     "target": "claim_export.subscriber_key",
     "hops": 3,
     "iterations": 2000,
-    "p95Micros": 115.9,
+    "p95Micros": 124.3,
     "note": "Worst-case chain in the fixture, measured separately from the average."
   },
   "fullTurn": {
     "iterations": 2000,
-    "p95Micros": 112.3,
+    "p95Micros": 152,
     "note": "Intent routing + gate + template fill. Still no network, no model call."
   },
   "coldStart": {
-    "millis": 2.42,
+    "millis": 1.99,
     "note": "Schema + fixtures loaded and first decision served, from a cold catalog."
   },
   "memory": {
     "retainedMedianKB": 1,
-    "retainedSpreadKB": 995,
+    "retainedSpreadKB": 994,
     "samplesKB": [
       994,
       1,
@@ -56,15 +56,15 @@
       9,
       -1
     ],
-    "processRssMB": 157.3,
+    "processRssMB": 157.5,
     "gcForced": true,
     "note": "retainedMedianKB is the catalog's RETAINED heap at steady state: GC, construct, 2000 decisions, GC, delta — repeated 5x. An earlier version measured the delta across the timing loop and reported 12.9/12.2/7.2 MB on successive runs; that was transient allocation, not retained memory, and it is withdrawn. Without --expose-gc (gcForced false) these samples are unreliable and should not be quoted. processRssMB is the whole Node process incl. the V8 baseline and is NOT a footprint claim."
   },
   "memoryRecall": {
     "corpus": 220,
     "iterations": 500,
-    "p50Micros": 839.4,
-    "p95Micros": 931.9,
+    "p50Micros": 888.3,
+    "p95Micros": 1008.4,
     "scannedPerQuery": 220,
     "benignQuery": {
       "hits": 5,
@@ -81,9 +81,9 @@
     "note": "Scoped recall over one caller's history, INCLUDING re-adjudication of every field-bearing hit. The local adapter is a full linear scan of the caller's entries with no vector index — that scan is precisely what a distributed vector index replaces in the CockroachDB adapter, so this figure is a ceiling, not a floor. withheld is reported for a query that TARGETS restricted memories; a benign query legitimately withholds nothing."
   },
   "armEfficiency": {
-    "decisionsPerSecPerCore": 9505,
+    "decisionsPerSecPerCore": 8490,
     "clinicDecisionsPerDay": 1200,
-    "cpuMillisPerDay": 126.2,
+    "cpuMillisPerDay": 141.3,
     "workingSetBytes": 10339,
     "workingSetPctOfL2": 0.25,
     "note": "The whole enforcement layer for a 3-provider clinic costs ~130 ms of one core per DAY, and its working set is a fraction of one L2 cache, so a decision touches no disk and, once warm, no DRAM. No Arm intrinsics are used — the claim is about the workload being small enough for an efficiency core, not about hand-vectorised code."
@@ -101,5 +101,5 @@
     "resolvedUnassistedPct": 83,
     "note": "Numerator excludes both human escalations AND UNKNOWN menu fallbacks — an unrecognised ask was not resolved, and counting it as such would inflate the rate. Refusals DO count as resolutions: declining an SSN and offering the records path is the product working. Denominator is every call reaching a terminal state."
   },
-  "generatedAt": "2026-08-02T19:23:26.224Z"
+  "generatedAt": "2026-08-04T00:02:29.423Z"
 }
