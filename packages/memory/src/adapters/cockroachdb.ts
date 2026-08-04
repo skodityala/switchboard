@@ -120,9 +120,13 @@ CREATE TABLE IF NOT EXISTS memory (
 );
 
 -- TOOL 1: the distributed vector index. This is what replaces the local
--- adapter's 918 µs linear scan.
-CREATE VECTOR INDEX IF NOT EXISTS memory_embedding_idx
-  ON memory (embedding);
+-- adapter's linear scan. subject_id is a PREFIX COLUMN of the index
+-- (verified live: without it the planner falls back to a FULL SCAN plus
+-- exact top-k, because a bare (embedding) index cannot serve a filtered
+-- search). The prefix also puts subject scoping INSIDE the index structure:
+-- a vector search physically cannot range over another caller's rows.
+CREATE VECTOR INDEX IF NOT EXISTS memory_subject_embedding_idx
+  ON memory (subject_id, embedding);
 
 CREATE INDEX IF NOT EXISTS memory_subject_idx ON memory (subject_id, kind);
 CREATE INDEX IF NOT EXISTS memory_call_idx    ON memory (call_id, subject_id, created_at);
@@ -230,6 +234,16 @@ export class CockroachMemory implements MemoryPort, MemoryStore {
       await c.connect();
       this.client = c;
     }
+    // Vector indexes sit behind a feature gate on self-hosted v25.2 (verified
+    // live: CREATE VECTOR INDEX fails until it is set). Best-effort: on managed
+    // clusters the setting may be preset or restricted, and either is fine —
+    // the schema below is what decides whether the index actually exists.
+    try {
+      await this.client.query('SET CLUSTER SETTING feature.vector_index.enabled = true');
+    } catch {
+      // Not permitted here (e.g. CockroachDB Cloud role) — proceed; if vector
+      // indexes are genuinely unavailable, CREATE VECTOR INDEX will say so.
+    }
     await this.client.query(CRDB_SCHEMA);
   }
 
@@ -239,8 +253,16 @@ export class CockroachMemory implements MemoryPort, MemoryStore {
   }
 
   // ── MemoryStore ───────────────────────────────────────────────────────────
+  /**
+   * Unlike the in-memory adapters, this table PERSISTS across processes, so a
+   * bare per-process counter collides on the second run (verified live:
+   * duplicate memory_pkey). Time component first so lexicographic order still
+   * follows insert order, then the process counter, then entropy.
+   */
   nextId(): string {
-    return `crdb_${String(++this.seq).padStart(6, '0')}`;
+    const t = this.now().getTime().toString(36).padStart(9, '0');
+    const n = String(++this.seq).padStart(6, '0');
+    return `crdb_${t}_${n}_${globalThis.crypto.randomUUID().slice(0, 8)}`;
   }
 
   /** Synchronous by interface; the rows were prefetched by recall(). */
