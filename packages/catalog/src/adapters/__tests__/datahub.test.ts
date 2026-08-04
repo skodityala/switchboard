@@ -12,7 +12,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
   DataHubCatalog,
-  DataHubSink,
   MissingCredentialError,
   TERM_TO_TIER,
   datasetUrn,
