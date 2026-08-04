@@ -114,11 +114,33 @@ export class DataHubCatalog implements CatalogPort, CatalogGraph {
 
 The five tiers are `PUBLIC · OPERATIONAL · PII · SENSITIVE_PII · PHI`, plus `UNCLASSIFIED` for absence. Map DataHub's terms onto these; if the instance uses different names, put the mapping in one exported constant so it is reviewable in the PR.
 
+## Standing up a local qualifying instance
+
+Real DataHub (not a stub) via the Docker quickstart, with metadata-service
+auth **enabled** so `DATAHUB_TOKEN` is enforced rather than decorative:
+
+```bash
+datahub docker quickstart          # generates ~/.datahub/quickstart/docker-compose.yml
+# set METADATA_SERVICE_AUTH_ENABLED: 'true' on BOTH datahub-gms and the
+# frontend service in that compose file, then compose up again.
+# Mint a PAT: UI (localhost:9002, datahub/datahub) → Settings → Access Tokens.
+
+# Load the fixture graph — zero-dependency, reads the SQLite fixture directly,
+# so the instance cannot drift from what the suite tests:
+DATAHUB_SERVER=http://localhost:8080 DATAHUB_TOKEN=<pat> node scripts/seed-datahub.mjs
+```
+
+`scripts/seed-datahub.mjs` is the ingestion recipe: platforms, the five tier
+glossary terms, all seven datasets with per-field terms, the eight column-level
+lineage edges, and the `switchboard.access_log` dataset the sink's
+access-decision lineage points at.
+
 ## Running the tests against your adapter
 
 ```bash
 npm test                     # local suite must still pass, unchanged
-DATAHUB_GMS='http://…' DATAHUB_TOKEN='…' npx vitest run packages/catalog
+DATAHUB_LIVE=1 DATAHUB_GMS='http://…/api/graphql' DATAHUB_TOKEN='…' \
+  npx vitest run packages/catalog
 ```
 
 The assertions your adapter must satisfy, from `packages/catalog/src/__tests__/`:

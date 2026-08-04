@@ -116,9 +116,17 @@ interface DatasetNode {
  * the graph knows which sensitive fields an AI workload actually requested, how
  * often they were refused, and which rule fired — metadata DataHub did not
  * previously hold, because nothing was enforcing anything.
+ *
+ * Three writes per decision, all additive:
+ *   1. addLink          — a human-readable decision note on the dataset
+ *   2. reportOperation  — usage metadata: the decision as an operational event
+ *   3. updateLineage    — access-decision lineage: the gated dataset feeds the
+ *                         Switchboard access log (once per dataset)
  */
 export class DataHubSink implements MetadataSink {
   private readonly pending: AccessTrace[] = [];
+  /** Datasets already linked into the access log — the edge is idempotent. */
+  private readonly linked = new Set<string>();
 
   constructor(
     private readonly gql: GraphQLTransport,
@@ -131,18 +139,25 @@ export class DataHubSink implements MetadataSink {
   }
 
   /**
-   * Each decision becomes an institutional-memory note on the dataset, keyed by
-   * field and rule. Deliberately additive: this adapter never mutates
-   * classifications it did not create, because an enforcement layer that edits
-   * the catalog it enforces against is a governance problem, not a feature.
+   * Deliberately additive: this adapter never mutates classifications it did
+   * not create, because an enforcement layer that edits the catalog it enforces
+   * against is a governance problem, not a feature.
    */
   async flush(): Promise<number> {
     if (this.pending.length === 0) return 0;
     const batch = this.pending.splice(0, this.pending.length);
 
-    const MUTATION = `
+    const NOTE = `
       mutation addNote($input: AddLinkInput!) {
         addLink(input: $input)
+      }`;
+    const OPERATION = `
+      mutation reportAccess($input: ReportOperationInput!) {
+        reportOperation(input: $input)
+      }`;
+    const LINEAGE = `
+      mutation linkAccessLog($input: UpdateLineageInput!) {
+        updateLineage(input: $input)
       }`;
 
     let written = 0;
@@ -154,7 +169,7 @@ export class DataHubSink implements MetadataSink {
           ? ` (inherited ${t.effectiveClassification} via ${t.lineage.length}-hop lineage)`
           : '');
       try {
-        await this.gql.query(MUTATION, {
+        await this.gql.query(NOTE, {
           input: {
             linkUrl: `switchboard://trace/${t.traceId}`,
             label,
@@ -167,6 +182,41 @@ export class DataHubSink implements MetadataSink {
         // already been made and logged locally; losing the write-back degrades
         // observability, not enforcement.
       }
+
+      // Usage metadata: the decision itself, as an operational event on the
+      // dataset. This is what makes "which fields does the AI actually request,
+      // and how often is it refused" answerable from inside DataHub.
+      try {
+        await this.gql.query(OPERATION, {
+          input: {
+            urn,
+            operationType: 'CUSTOM',
+            customOperationType: `SWITCHBOARD_${t.decision}`,
+            sourceType: 'DATA_PROCESS',
+          },
+        });
+      } catch {
+        // Same rule: observability degrades, enforcement does not.
+      }
+
+      // Access-decision lineage: every dataset the gate adjudicates flows into
+      // the Switchboard access log. One edge per dataset; the graph then shows
+      // the enforcement layer as a first-class consumer of the data it gates.
+      if (!this.linked.has(urn)) {
+        this.linked.add(urn);
+        try {
+          await this.gql.query(LINEAGE, {
+            input: {
+              edgesToAdd: [
+                { upstreamUrn: urn, downstreamUrn: accessLogUrn() },
+              ],
+              edgesToRemove: [],
+            },
+          });
+        } catch {
+          this.linked.delete(urn); // retry on the next decision for this dataset
+        }
+      }
     }
     return written;
   }
@@ -174,6 +224,16 @@ export class DataHubSink implements MetadataSink {
   get queued(): number {
     return this.pending.length;
   }
+}
+
+/**
+ * The dataset that represents Switchboard's audit log inside the DataHub graph.
+ * Access-decision lineage points every gated dataset at this node, so the
+ * Lineage tab shows the enforcement layer consuming the data it gates.
+ * scripts/seed-datahub.mjs creates it.
+ */
+export function accessLogUrn(): string {
+  return 'urn:li:dataset:(urn:li:dataPlatform:switchboard,access_log,PROD)';
 }
 
 /** DataHub URN for a dataset. Matches the fixture's URN shape. */
