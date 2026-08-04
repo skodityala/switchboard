@@ -73,7 +73,7 @@ And it holds under a hostile reasoner: a model jailbroken onto every restricted 
 
 ### Numbers, and the ones we withdrew
 
-105 tests · 40 KB core · zero runtime dependencies · p95 decision ~117.8 µs · $0/call on the deterministic path · runs offline from a bare clone.
+294 tests · 40 KB core · zero runtime dependencies · p95 decision ~117.8 µs · $0/call on the deterministic path · runs offline from a bare clone.
 
 Four figures failed our own refutation pass and were corrected or dropped, including a memory-footprint number **withdrawn entirely** after it proved to be measurement noise. `npm run check:numbers` fails the build if a withdrawn figure reappears in prose.
 

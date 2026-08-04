@@ -74,7 +74,7 @@ The three things a judge should hit in the first twenty seconds:
 
 ## What is filed vs what can still improve
 
-**Filed now:** working product, hosted demo, cross-arch CI benchmark, 105 tests, full written submission.
+**Filed now:** working product, hosted demo, cross-arch CI benchmark, 294 tests, full written submission.
 
 **Can be edited in afterwards:** the video, and any change from a later judge simulation.
 

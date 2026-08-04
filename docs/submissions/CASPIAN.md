@@ -64,7 +64,7 @@ Three properties, each asserted in the test suite:
 - **An unknown field is denied.** `UNCLASSIFIED` is the fail-closed default — add a column, forget to classify it, get a refusal instead of a leak.
 - **A value cannot be read without a decision.** `readValue()` takes a trace, not a field reference, and yields nothing unless that trace is an ALLOW. There is no signature that bypasses the gate.
 
-**Attack it yourself.** The demo has a free-text box running the same compiled gate the 38 tests run — nothing scripted. Ten adversarial phrasings ship as tests, including a SQL-style request and a Spanish-language one, because the denial is not English-pattern-dependent.
+**Attack it yourself.** The demo has a free-text box running the same compiled gate the 294 tests run — nothing scripted. Ten adversarial phrasings ship as tests, including a SQL-style request and a Spanish-language one, because the denial is not English-pattern-dependent.
 
 It still works as a phone agent: 83% of calls resolve without a human, counting refusals as resolutions and excluding anything it didn't understand.
 

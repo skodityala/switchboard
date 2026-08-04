@@ -89,7 +89,7 @@ Runs entirely on-device: no cloud account, no API key, no data egress. Patient d
 
 ### Technical implementation
 
-105 tests · CI green on **both arm64 and x86_64** · 120 decision-parity assertions · p95 policy decision **~117.8 µs** · the entire enforcement layer for a 3-provider clinic costs **~141 ms of one core per day** · 40 KB core bundle with zero runtime dependencies · every benchmark regenerates from a clean clone.
+294 tests · CI green on **both arm64 and x86_64** · 120 decision-parity assertions · p95 policy decision **~117.8 µs** · the entire enforcement layer for a 3-provider clinic costs **~141 ms of one core per day** · 40 KB core bundle with zero runtime dependencies · every benchmark regenerates from a clean clone.
 
 ### Numbers we withdrew
 
@@ -102,7 +102,7 @@ Four figures failed our own refutation pass before shipping. 92% resolved-unassi
 | Criterion | Score | Reasoning |
 |---|---|---|
 | Innovation & Creativity (20%) | 17/20 | Refusal-as-product is genuinely unusual in a field of chat wrappers. |
-| Technical Implementation (25%) | **21/25** | Three reasoners, one gate, cross-arch CI, 105 tests. Held back: single-tenant on-device, which reads oddly for "SaaS". |
+| Technical Implementation (25%) | **21/25** | Three reasoners, one gate, cross-arch CI, 294 tests. Held back: single-tenant on-device, which reads oddly for "SaaS". |
 | Impact | 8/10 | Named buyer, named cost, checkable TAM. |
 | Design | 7/10 | Console is polished; no pricing page or buyer-facing artifact. |
 | Presentation | 8/10 | Numbers specific and sourced. |
