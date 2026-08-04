@@ -14,7 +14,7 @@
  *
  * Prose, framing and caveats are never touched — only the figures.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs';
 
 const r = JSON.parse(readFileSync('bench/results.json', 'utf8'));
 const d = r.catalogDecision;
@@ -95,7 +95,16 @@ for (const f of TARGETS) {
     after = next;
   }
   if (after !== before) {
-    writeFileSync(f, after);
+    // Atomic replace: a reader (or a concurrent check:numbers) must never see a
+    // half-written document. Flagged by CodeQL as js/file-system-race.
+    const tmp = `${f}.${process.pid}.tmp`;
+    try {
+      writeFileSync(tmp, after, { flag: 'wx' });
+      renameSync(tmp, f);
+    } catch (err) {
+      try { unlinkSync(tmp); } catch { /* nothing to clean up */ }
+      throw err;
+    }
     touched++;
     console.log(`  ${f}\n    synced: ${applied.join(', ')}`);
   }

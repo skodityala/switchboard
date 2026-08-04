@@ -425,16 +425,45 @@ const RANK: Readonly<Record<Classification, number>> = {
 
 /** `urn:li:dataset:(urn:li:dataPlatform:clinic,patient,PROD)` + path → `patient.ssn`. */
 export function fieldKeyFromUrn(urn: string, path?: string): string | null {
-  const m = /,([^,)]+),[A-Z]+\)/.exec(urn);
-  const table = m?.[1];
+  // Linear scan for the same reason as urnField: no regex backtracking on input
+  // this process does not author.
+  const table = urnTable(urn);
   if (!table) return null;
   const field = path ?? urnField(urn);
   return field ? `${table}.${field}` : null;
 }
 
+/**
+ * Extract the field name from a schemaField URN.
+ *
+ * Deliberately NOT a regex. The previous /schemaField:\(.*?,([^)]+)\)/ was
+ * flagged by CodeQL as polynomial ReDoS (js/polynomial-redos): a lazy `.*?`
+ * followed by a negated class backtracks catastrophically on a crafted input,
+ * and URNs arrive from a DataHub instance — data this process does not author.
+ * Linear scanning has no backtracking behaviour to exploit.
+ */
 function urnField(urn: string): string | null {
-  const m = /schemaField:\(.*?,([^)]+)\)/.exec(urn);
-  return m?.[1] ?? null;
+  const marker = 'schemaField:(';
+  const start = urn.indexOf(marker);
+  if (start === -1) return null;
+  const comma = urn.indexOf(',', start + marker.length);
+  if (comma === -1) return null;
+  const close = urn.indexOf(')', comma + 1);
+  if (close === -1) return null;
+  const field = urn.slice(comma + 1, close);
+  return field.length > 0 ? field : null;
+}
+
+/** Dataset name from `urn:li:dataset:(urn:li:dataPlatform:X,TABLE,ENV)`. */
+function urnTable(urn: string): string | null {
+  const close = urn.lastIndexOf(')');
+  if (close === -1) return null;
+  const envComma = urn.lastIndexOf(',', close - 1);
+  if (envComma === -1) return null;
+  const tableComma = urn.lastIndexOf(',', envComma - 1);
+  if (tableComma === -1) return null;
+  const table = urn.slice(tableComma + 1, envComma);
+  return table.length > 0 ? table : null;
 }
 
 function splitKey(key: string): FieldRef {

@@ -22,7 +22,7 @@
 // fetched once by an explicit command, after which the path is fully offline.
 
 import type { CatalogPort } from '@switchboard/catalog';
-import { runTurn, INTENT_FIELDS } from '../turn.js';
+import { runTurn } from '../turn.js';
 import type { CallState, Intent, ReasonerPort, Turn, Utterance } from '../port.js';
 
 /** Structural declaration of the transformers.js surface this adapter uses. */
