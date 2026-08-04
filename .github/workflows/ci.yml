@@ -37,7 +37,7 @@ jobs:
         run: npm run bench:mem
       - name: rename result for this arch
         run: cp bench/results.json bench/results-${{ matrix.arch }}.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bench-${{ matrix.arch }}
           path: bench/results-${{ matrix.arch }}.json
@@ -57,7 +57,7 @@ jobs:
           path: bench
       - name: compare
         run: node scripts/compare-arch.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: arch-comparison
           path: |
