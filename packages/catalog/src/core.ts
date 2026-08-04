@@ -200,6 +200,53 @@ export function adjudicate(
 }
 
 /**
+ * Normalise a value for identity comparison.
+ *
+ * Accepts 1954-03-11, 03/11/1954 and "March 11 1954" as the same date, so a
+ * caller is not failed for phrasing. Shared by every adapter's matchesValue so
+ * verification behaves identically regardless of where the row lives.
+ */
+export function normaliseForComparison(s: string): string {
+  const t = s.toLowerCase().trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const us = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(t);
+  if (us) return `${us[3]}-${us[1]!.padStart(2, '0')}-${us[2]!.padStart(2, '0')}`;
+  const MONTHS = ['january','february','march','april','may','june',
+                  'july','august','september','october','november','december'];
+  const words = /^([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/.exec(t);
+  if (words) {
+    const m = MONTHS.indexOf(words[1]!);
+    if (m >= 0) return `${words[3]}-${String(m + 1).padStart(2, '0')}-${words[2]!.padStart(2, '0')}`;
+  }
+  return t;
+}
+
+/**
+ * Independently re-check a trace before honouring it.
+ *
+ * readValue() must not simply trust its argument. In real flows only the gate
+ * produces AccessTrace objects, but "only by convention" is precisely the kind of
+ * guarantee this product exists to replace. A forged
+ * `{decision:'ALLOW', requested:<restricted field>}` would otherwise unlock a
+ * value, so the field is re-adjudicated here against the same graph.
+ *
+ * Returns true only if the trace's own field is genuinely disclosable.
+ */
+export function traceIsHonest(
+  graph: CatalogGraph,
+  trace: AccessTrace,
+): boolean {
+  if (trace.decision !== 'ALLOW') return false;
+  const declared = graph.classifySync(trace.requested);
+  const effective = effectiveOf(graph, trace.requested, declared);
+  // Never-disclosable tiers can never back an ALLOW, whatever the trace says.
+  if (effective === 'UNCLASSIFIED' || NEVER_DISCLOSABLE.has(effective)) return false;
+  // The trace must also agree with the graph about what the field IS.
+  return trace.effectiveClassification === effective;
+}
+
+/**
  * Serialisable catalog contents. Produced from the SQLite catalog by
  * `scripts/build-console.mjs`, so the browser's data cannot drift from the
  * fixture the suite tests — and a parity test asserts exactly that.

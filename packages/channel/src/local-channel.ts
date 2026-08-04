@@ -4,6 +4,7 @@
 // QUALIFYING ADAPTER: CALL-E SDK — see docs/adapters/CALLE.md.
 
 import { CallMachine, SilentSink, type SpeechSink, type VerificationOracle } from './core.js';
+import type { FieldRef } from '@switchboard/catalog';
 import type {
   CallEvent,
   CallerIdentity,
@@ -49,36 +50,21 @@ export class BrowserSpeechSink implements SpeechSink {
 }
 
 /**
- * Verification against the catalog's own row store. Note what this does NOT do:
- * it never returns the date of birth, only whether a supplied value matches. The
- * field stays PII and unreadable; verification is a comparison, not a read.
+ * Verification against the catalog, without a disclosure path.
+ *
+ * This takes a COMPARISON function, not a lookup. Previously it received a
+ * value-returning lookup, which callers satisfied by forging an ALLOW trace and
+ * calling readValue() on patient.date_of_birth — PII, and a read that should
+ * never have been possible. CatalogPort.matchesValue answers "does this match?"
+ * with a boolean, so the field is never returned to anyone, including us.
  */
 export class RowStoreOracle implements VerificationOracle {
-  constructor(private readonly lookup: (subjectId: string, field: string) => string | undefined) {}
+  constructor(
+    private readonly compare: (subjectId: string, field: FieldRef, candidate: string) => boolean,
+  ) {}
 
   matches(subjectId: string, dateOfBirth: string): boolean {
-    const onFile = this.lookup(subjectId, 'patient.date_of_birth');
-    if (onFile === undefined) return false;
-    return this.normalise(onFile) === this.normalise(dateOfBirth);
-  }
-
-  /** Accepts 1954-03-11, 03/11/1954, "March 11 1954". */
-  private normalise(s: string): string {
-    const t = s.toLowerCase().trim();
-    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
-    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-    const us = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(t);
-    if (us) return `${us[3]}-${us[1]!.padStart(2, '0')}-${us[2]!.padStart(2, '0')}`;
-    const MONTHS = [
-      'january','february','march','april','may','june',
-      'july','august','september','october','november','december',
-    ];
-    const words = /^([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/.exec(t);
-    if (words) {
-      const m = MONTHS.indexOf(words[1]!);
-      if (m >= 0) return `${words[3]}-${String(m + 1).padStart(2, '0')}-${words[2]!.padStart(2, '0')}`;
-    }
-    return t;
+    return this.compare(subjectId, { table: 'patient', field: 'date_of_birth' }, dateOfBirth);
   }
 }
 

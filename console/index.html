@@ -326,10 +326,9 @@ const sink = { utter: (t) => { if (!muted) speech.utter(t); }, cancel: () => spe
 const channel = new LocalChannel({
   sink,
   // Verification compares against held data; it never returns the DOB.
-  oracle: new RowStoreOracle((subjectId, key) => {
-    const [table, field] = key.split('.');
-    return readValue({ decision: 'ALLOW', requested: { table, field } }, subjectId);
-  }),
+  oracle: new RowStoreOracle((subjectId, field, candidate) =>
+      catalog.matchesValue(field, subjectId, candidate),
+    ),
 });
 
 let callId = null;

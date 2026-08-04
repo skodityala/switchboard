@@ -25,7 +25,12 @@
 //              DATAHUB_TOKEN (personal access token)
 // See docs/adapters/DATAHUB.md for the runbook.
 
-import { adjudicate, type CatalogGraph } from '../core.js';
+import {
+  adjudicate,
+  traceIsHonest,
+  normaliseForComparison,
+  type CatalogGraph,
+} from '../core.js';
 import type {
   AccessRequest,
   AccessTrace,
@@ -380,10 +385,28 @@ export class DataHubCatalog implements CatalogPort, CatalogGraph {
    * adapter never needs database credentials of its own.
    */
   readValue(trace: AccessTrace, subjectId: string): string | undefined {
-    if (trace.decision !== 'ALLOW') return undefined;
+    // Defence in depth: re-adjudicate rather than trusting the trace handed in.
+    if (!traceIsHonest(this, trace)) return undefined;
     const byId = this.values[`${trace.requested.table}.${trace.requested.field}`];
     if (!byId) return undefined;
     return byId[subjectId] ?? byId['*'];
+  }
+
+  /** Unguarded lookup, used ONLY by matchesValue. */
+  private rawValue(ref: FieldRef, subjectId: string): string | undefined {
+    const byId = this.values[`${ref.table}.${ref.field}`];
+    if (!byId) return undefined;
+    return byId[subjectId] ?? byId['*'];
+  }
+
+  /**
+   * Identity comparison without disclosure. Returns a boolean, never the value,
+   * so PII used for verification is never readable through this path.
+   */
+  matchesValue(ref: FieldRef, subjectId: string, candidate: string): boolean {
+    const v = this.rawValue(ref, subjectId);
+    if (v === undefined) return false;
+    return normaliseForComparison(v) === normaliseForComparison(candidate);
   }
 
   get isWarm(): boolean {

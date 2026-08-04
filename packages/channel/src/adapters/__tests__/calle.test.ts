@@ -56,10 +56,9 @@ function fakeTransport(): { transport: CallETransport; said: string[]; dialled: 
 function channel(t: CallETransport) {
   return new CallEChannel({
     transport: t,
-    oracle: new RowStoreOracle((subjectId, key) => {
-      const [table, field] = key.split('.') as [string, string];
-      return catalog.readValue({ decision: 'ALLOW', requested: { table, field } } as never, subjectId);
-    }),
+    oracle: new RowStoreOracle((subjectId, field, candidate) =>
+      catalog.matchesValue(field, subjectId, candidate),
+    ),
   });
 }
 
@@ -218,10 +217,7 @@ describe('live CALL-E (opt-in)', () => {
     expect(num, 'CALLE_LIVE=1 requires CALLE_DEMO_NUMBER.').toBeTruthy();
 
     const ch = new CallEChannel({
-      oracle: new RowStoreOracle((s, k) => {
-        const [t, fl] = k.split('.') as [string, string];
-        return catalog.readValue({ decision: 'ALLOW', requested: { table: t, field: fl } } as never, s);
-      }),
+      oracle: new RowStoreOracle((s, field, candidate) => catalog.matchesValue(field, s, candidate)),
     });
     const ev = await ch.startCall(DOLORES);
     expect(ch.identity(ev.callId).verified).toBe(false);

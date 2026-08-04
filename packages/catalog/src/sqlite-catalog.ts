@@ -21,6 +21,8 @@ import type {
 } from './port.js';
 import {
   adjudicate,
+  traceIsHonest,
+  normaliseForComparison,
   type CatalogGraph,
   type CatalogSnapshot,
   type DeclaredTier,
@@ -211,7 +213,8 @@ export class SqliteCatalog implements CatalogPort, CatalogGraph {
    * convention the reasoner is trusted to follow.
    */
   readValue(trace: AccessTrace, subjectId: string): string | undefined {
-    if (trace.decision !== 'ALLOW') return undefined;
+    // Defence in depth: re-adjudicate rather than trusting the trace handed in.
+    if (!traceIsHonest(this, trace)) return undefined;
     const row = this.db
       .prepare(
         `SELECT value FROM row_store
@@ -222,6 +225,28 @@ export class SqliteCatalog implements CatalogPort, CatalogGraph {
       | { value: string }
       | undefined;
     return row?.value;
+  }
+
+  /** Unguarded lookup, used ONLY by matchesValue. Never returns to a caller. */
+  private rawValue(ref: FieldRef, subjectId: string): string | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT value FROM row_store
+         WHERE table_name = ? AND field_name = ?
+           AND (subject_id = ? OR subject_id = '*')`,
+      )
+      .get(ref.table, ref.field, subjectId) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  /**
+   * Identity comparison without disclosure. Returns a boolean, never the value,
+   * so PII used for verification is never readable through this path.
+   */
+  matchesValue(ref: FieldRef, subjectId: string, candidate: string): boolean {
+    const v = this.rawValue(ref, subjectId);
+    if (v === undefined) return false;
+    return normaliseForComparison(v) === normaliseForComparison(candidate);
   }
 
   /** Blocked-reads counter, queried from the log so it cannot drift. */

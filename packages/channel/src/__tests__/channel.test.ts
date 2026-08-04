@@ -39,14 +39,9 @@ beforeEach(() => {
   channel = new LocalChannel({
     sink,
     // Verification compares against held data; it never reads the DOB out.
-    oracle: new RowStoreOracle((subjectId, key) => {
-      const [table, field] = key.split('.') as [string, string];
-      const trace = {
-        decision: 'ALLOW' as const,
-        requested: { table, field },
-      };
-      return catalog.readValue(trace as never, subjectId);
-    }),
+    oracle: new RowStoreOracle((subjectId, field, candidate) =>
+      catalog.matchesValue(field, subjectId, candidate),
+    ),
   });
 });
 

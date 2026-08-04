@@ -149,6 +149,53 @@ function adjudicate(graph, request, meta) {
         durationMicros: Math.max(1, Math.round(nowMicros() - t0)),
     };
 }
+/**
+ * Normalise a value for identity comparison.
+ *
+ * Accepts 1954-03-11, 03/11/1954 and "March 11 1954" as the same date, so a
+ * caller is not failed for phrasing. Shared by every adapter's matchesValue so
+ * verification behaves identically regardless of where the row lives.
+ */
+function normaliseForComparison(s) {
+    const t = s.toLowerCase().trim();
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+    if (iso)
+        return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const us = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(t);
+    if (us)
+        return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
+    const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december'];
+    const words = /^([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/.exec(t);
+    if (words) {
+        const m = MONTHS.indexOf(words[1]);
+        if (m >= 0)
+            return `${words[3]}-${String(m + 1).padStart(2, '0')}-${words[2].padStart(2, '0')}`;
+    }
+    return t;
+}
+/**
+ * Independently re-check a trace before honouring it.
+ *
+ * readValue() must not simply trust its argument. In real flows only the gate
+ * produces AccessTrace objects, but "only by convention" is precisely the kind of
+ * guarantee this product exists to replace. A forged
+ * `{decision:'ALLOW', requested:<restricted field>}` would otherwise unlock a
+ * value, so the field is re-adjudicated here against the same graph.
+ *
+ * Returns true only if the trace's own field is genuinely disclosable.
+ */
+function traceIsHonest(graph, trace) {
+    if (trace.decision !== 'ALLOW')
+        return false;
+    const declared = graph.classifySync(trace.requested);
+    const effective = effectiveOf(graph, trace.requested, declared);
+    // Never-disclosable tiers can never back an ALLOW, whatever the trace says.
+    if (effective === 'UNCLASSIFIED' || NEVER_DISCLOSABLE.has(effective))
+        return false;
+    // The trace must also agree with the graph about what the field IS.
+    return trace.effectiveClassification === effective;
+}
 /** Splits `table.field`. Field names never contain a dot. */
 function refOf(key) {
     const i = key.indexOf('.');
@@ -543,41 +590,21 @@ class BrowserSpeechSink {
     }
 }
 /**
- * Verification against the catalog's own row store. Note what this does NOT do:
- * it never returns the date of birth, only whether a supplied value matches. The
- * field stays PII and unreadable; verification is a comparison, not a read.
+ * Verification against the catalog, without a disclosure path.
+ *
+ * This takes a COMPARISON function, not a lookup. Previously it received a
+ * value-returning lookup, which callers satisfied by forging an ALLOW trace and
+ * calling readValue() on patient.date_of_birth — PII, and a read that should
+ * never have been possible. CatalogPort.matchesValue answers "does this match?"
+ * with a boolean, so the field is never returned to anyone, including us.
  */
 class RowStoreOracle {
-    lookup;
-    constructor(lookup) {
-        this.lookup = lookup;
+    compare;
+    constructor(compare) {
+        this.compare = compare;
     }
     matches(subjectId, dateOfBirth) {
-        const onFile = this.lookup(subjectId, 'patient.date_of_birth');
-        if (onFile === undefined)
-            return false;
-        return this.normalise(onFile) === this.normalise(dateOfBirth);
-    }
-    /** Accepts 1954-03-11, 03/11/1954, "March 11 1954". */
-    normalise(s) {
-        const t = s.toLowerCase().trim();
-        const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
-        if (iso)
-            return `${iso[1]}-${iso[2]}-${iso[3]}`;
-        const us = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(t);
-        if (us)
-            return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
-        const MONTHS = [
-            'january', 'february', 'march', 'april', 'may', 'june',
-            'july', 'august', 'september', 'october', 'november', 'december',
-        ];
-        const words = /^([a-z]+)\s+(\d{1,2}),?\s+(\d{4})$/.exec(t);
-        if (words) {
-            const m = MONTHS.indexOf(words[1]);
-            if (m >= 0)
-                return `${words[3]}-${String(m + 1).padStart(2, '0')}-${words[2].padStart(2, '0')}`;
-        }
-        return t;
+        return this.compare(subjectId, { table: 'patient', field: 'date_of_birth' }, dateOfBirth);
     }
 }
 class LocalChannel {

@@ -146,6 +146,19 @@ export interface MetadataSink {
  */
 export interface ValueReader {
   readValue(trace: AccessTrace, subjectId: string): string | undefined;
+
+  /**
+   * Constant-shape identity check. Returns whether `candidate` matches the value
+   * on file — never the value itself.
+   *
+   * This exists because verification is a COMPARISON, not a read. Previously the
+   * channel forged an ALLOW trace to read patient.date_of_birth through
+   * readValue(), which is PII and should never have been readable that way; once
+   * readValue began re-adjudicating, that forgery was correctly refused. A
+   * boolean-returning primitive cannot leak the field, so identity checks no
+   * longer need a disclosure path at all.
+   */
+  matchesValue(ref: FieldRef, subjectId: string, candidate: string): boolean;
 }
 
 export interface CatalogPort extends ValueReader {
