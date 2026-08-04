@@ -112,13 +112,17 @@ const parts = [
   '//   packages/memory/dist/core.js             (gated recall)',
   '//   packages/channel/dist/core.js            (call lifecycle)',
   '//   packages/channel/dist/local-channel.js   (speechSynthesis sink)',
-  '//   packages/reasoner/dist/deterministic.js  (intent routing + templates)',
+  '//   packages/reasoner/dist/turn.js           (the one turn pipeline)',
+  '//   packages/reasoner/dist/deterministic.js  (intent routing)',
   '// The catalog snapshot below is generated from packages/catalog/fixtures/,',
   '// so the console cannot drift from the fixture the suite tests.',
   '',
   moduleIIFE('packages/catalog/dist/core.js', [
     'RESTRICTION_ORDER', 'rank', 'NEVER_DISCLOSABLE', 'keyOf', 'effectiveOf',
     'evaluate', 'adjudicate', 'refOf', 'SnapshotGraph',
+    // Without these the console's readValue could not re-verify a trace, making
+    // the page weaker than the adapters the tests cover.
+    'traceIsHonest', 'normaliseForComparison',
   ]),
   moduleIIFE('packages/memory/dist/core.js', [
     'EMBED_DIM', 'tokenize', 'embed', 'cosine', 'buildEntry', 'recallCore',
@@ -130,16 +134,24 @@ const parts = [
   moduleIIFE('packages/channel/dist/local-channel.js', [
     'BrowserSpeechSink', 'RowStoreOracle', 'LocalChannel',
   ]),
+  // turn.js owns the pipeline the reasoners delegate to, so it must be inlined
+  // before them — its bindings are captured by their closures.
+  moduleIIFE('packages/reasoner/dist/turn.js', [
+    'INTENT_FIELDS', 'TEMPLATES', 'refusalFor', 'runTurn',
+  ]),
   moduleIIFE('packages/reasoner/dist/deterministic.js', [
-    'INTENT_FIELDS', 'normalize', 'DeterministicReasoner',
+    'normalize', 'DeterministicReasoner',
   ]),
   '',
   `export const SNAPSHOT = ${JSON.stringify(snapshot, null, 2)};`,
   '',
   '// The exports the page consumes. Everything above is unmodified compiled code.',
   'export { adjudicate, effectiveOf, evaluate, SnapshotGraph, keyOf, refOf,',
-  '         RESTRICTION_ORDER, NEVER_DISCLOSABLE, rank };',
+  '         RESTRICTION_ORDER, NEVER_DISCLOSABLE, rank,',
+  '         traceIsHonest, normaliseForComparison };',
   'export { DeterministicReasoner, INTENT_FIELDS, normalize };',
+  '// turn pipeline: the ONE path from an intent to a reply',
+  'export { runTurn, TEMPLATES, refusalFor };',
   '// memory core: embedding, cosine and GATED recall — scope + re-adjudication',
   'export { embed, cosine, tokenize, EMBED_DIM, recallCore, buildEntry, decisionWrite };',
   '// channel core: call lifecycle state machine + speechSynthesis sink',
