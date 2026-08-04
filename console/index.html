@@ -462,7 +462,26 @@ const channel = new LocalChannel({
 });
 
 let callId = null;
-const stats = { blocked: 0, calls: 0, resolved: 0, timings: [] };
+/**
+ * Bounded metrics window.
+ *
+ * timings was an unbounded array: a judge leaving this tab open and attacking
+ * repeatedly accumulated one sample per decision forever, and p95() re-sorted
+ * the whole thing on every turn — O(n log n) per keystroke, with n growing. A
+ * ring buffer bounds both the memory and the sort. 512 samples is far more than
+ * a p95 needs to be stable and costs about 4 KB.
+ */
+const TIMING_WINDOW = 512;
+const stats = {
+  blocked: 0, calls: 0, resolved: 0,
+  timings: new Float64Array(TIMING_WINDOW), tCount: 0, tHead: 0,
+};
+
+function recordTiming(us) {
+  stats.timings[stats.tHead] = us;
+  stats.tHead = (stats.tHead + 1) % TIMING_WINDOW;
+  if (stats.tCount < TIMING_WINDOW) stats.tCount++;
+}
 
 // ── rendering ───────────────────────────────────────────────────────────────
 const chip = (t) => `<span class="chip" style="color:var(--t-${t})">${t}</span>`;
@@ -527,10 +546,11 @@ function pushSys(text) {
   $('transcript').scrollTop = $('transcript').scrollHeight;
 }
 
-const p95 = (a) => {
-  if (!a.length) return null;
-  const s = [...a].sort((x, y) => x - y);
-  return s[Math.min(s.length - 1, Math.ceil(s.length * 0.95) - 1)];
+/** p95 over the bounded window. Sorts at most TIMING_WINDOW samples. */
+const p95 = () => {
+  if (stats.tCount === 0) return null;
+  const s = Array.prototype.slice.call(stats.timings, 0, stats.tCount).sort((x, y) => x - y);
+  return Math.round(s[Math.min(s.length - 1, Math.ceil(s.length * 0.95) - 1)]);
 };
 
 function paintMetrics() {
@@ -538,7 +558,7 @@ function paintMetrics() {
   $('v-resolved').innerHTML = stats.calls
     ? Math.round(100 * stats.resolved / stats.calls) + '<span class="unit">%</span>'
     : '—<span class="unit">%</span>';
-  const q = p95(stats.timings);
+  const q = p95();
   $('v-p95').innerHTML = (q ?? '—') + '<span class="unit">µs</span>';
 }
 
@@ -597,7 +617,7 @@ async function say(text) {
     pushTurn('AGENT', reply, { spoken: !muted });
     renderMemory(result);
     if (result.traces.length) $('traces').innerHTML = result.traces.map(renderTrace).join('');
-    for (const t of result.traces) stats.timings.push(t.durationMicros);
+    for (const t of result.traces) recordTiming(t.durationMicros);
     stats.blocked += result.traces.filter((t) => t.decision === 'DENY').length;
     stats.calls++; stats.resolved++;
     paintMetrics();
@@ -637,7 +657,7 @@ async function say(text) {
   stats.calls++;
   stats.blocked += denied.length;
   if (!turn.escalatedToHuman && turn.intent !== 'UNKNOWN') stats.resolved++;
-  for (const t of turn.traces) stats.timings.push(t.durationMicros);
+  for (const t of turn.traces) recordTiming(t.durationMicros);
   paintMetrics();
   renderMemory(null);
 
@@ -850,7 +870,7 @@ async function runRedTeam() {
   };
 
   let blocked = 0, leaked = 0, noread = 0;
-  const times = [];
+  const times = [];   // bounded by ATTACKS.length, so a plain array is fine here
 
   for (const [i, atk] of ATTACKS.entries()) {
     const utter = { callId: atkCall, text: atk.text ?? atk.label, channel: 'PHONE' };

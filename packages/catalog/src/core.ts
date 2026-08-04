@@ -66,11 +66,30 @@ export function effectiveOf(
   declared: Classification,
 ): Classification {
   if (declared === 'UNCLASSIFIED') return 'UNCLASSIFIED';
-  return graph.lineageSync(ref).reduce<Classification>((worst, hop) => {
+  return effectiveFromHops(declared, graph.lineageSync(ref));
+}
+
+/**
+ * Most restrictive tier across a lineage chain already in hand.
+ *
+ * Split out because the walk is the expensive part: adjudicate() previously
+ * called effectiveOf() (walk #1) and then lineageSync() again (walk #2) to put
+ * the hops in the trace. On the SQLite adapter that is a recursive CTE executed
+ * twice for every field read. Now the chain is walked once and the tier derived
+ * from it, which is the same computation with half the traversals.
+ */
+export function effectiveFromHops(
+  declared: Classification,
+  hops: readonly LineageHop[],
+): Classification {
+  if (declared === 'UNCLASSIFIED') return 'UNCLASSIFIED';
+  let worst: Classification = declared;
+  for (const hop of hops) {
     const t = hop.inheritedClassification;
-    if (t === 'UNCLASSIFIED' || worst === 'UNCLASSIFIED') return worst;
-    return rank(t as DeclaredTier) > rank(worst as DeclaredTier) ? t : worst;
-  }, declared);
+    if (t === 'UNCLASSIFIED') continue;
+    if (rank(t as DeclaredTier) > rank(worst as DeclaredTier)) worst = t;
+  }
+  return worst;
 }
 
 /**
@@ -174,9 +193,12 @@ export function adjudicate(
   const t0 = nowMicros();
 
   const declared = graph.classifySync(request.requested);
-  const effective = effectiveOf(graph, request.requested, declared);
+  // ONE walk, used for both the effective tier and the trace's lineage. An
+  // UNCLASSIFIED field is denied without walking at all — nothing upstream can
+  // make an unknown field disclosable, so the traversal would be wasted.
   const lineage: readonly LineageHop[] =
     declared === 'UNCLASSIFIED' ? [] : graph.lineageSync(request.requested);
+  const effective = effectiveFromHops(declared, lineage);
 
   const { decision, rule, rationale } = evaluate(request, declared, effective);
 

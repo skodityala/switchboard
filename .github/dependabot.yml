@@ -1,0 +1,21 @@
+# Dependabot was disabled, and `npm audit` was reporting 5 vulnerabilities
+# including 1 critical (all in the vitest/vite dev chain, now fixed by upgrading
+# to vitest 4). Weekly checks stop that from silently recurring.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the test toolchain rather than four, since they move together.
+      dev-tooling:
+        patterns: ['vitest', '@vitest/*', 'vite', 'typescript', '@types/*']
+    commit-message:
+      prefix: 'deps'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

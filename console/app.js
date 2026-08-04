@@ -39,12 +39,29 @@ const keyOf = (ref) => `${ref.table}.${ref.field}`;
 function effectiveOf(graph, ref, declared) {
     if (declared === 'UNCLASSIFIED')
         return 'UNCLASSIFIED';
-    return graph.lineageSync(ref).reduce((worst, hop) => {
+    return effectiveFromHops(declared, graph.lineageSync(ref));
+}
+/**
+ * Most restrictive tier across a lineage chain already in hand.
+ *
+ * Split out because the walk is the expensive part: adjudicate() previously
+ * called effectiveOf() (walk #1) and then lineageSync() again (walk #2) to put
+ * the hops in the trace. On the SQLite adapter that is a recursive CTE executed
+ * twice for every field read. Now the chain is walked once and the tier derived
+ * from it, which is the same computation with half the traversals.
+ */
+function effectiveFromHops(declared, hops) {
+    if (declared === 'UNCLASSIFIED')
+        return 'UNCLASSIFIED';
+    let worst = declared;
+    for (const hop of hops) {
         const t = hop.inheritedClassification;
-        if (t === 'UNCLASSIFIED' || worst === 'UNCLASSIFIED')
-            return worst;
-        return rank(t) > rank(worst) ? t : worst;
-    }, declared);
+        if (t === 'UNCLASSIFIED')
+            continue;
+        if (rank(t) > rank(worst))
+            worst = t;
+    }
+    return worst;
 }
 /**
  * Rule evaluation, ordered most-restrictive-first. Exactly one rule fires and it
@@ -129,8 +146,11 @@ const nowMicros = () => globalThis.performance.now() * 1000;
 function adjudicate(graph, request, meta) {
     const t0 = nowMicros();
     const declared = graph.classifySync(request.requested);
-    const effective = effectiveOf(graph, request.requested, declared);
+    // ONE walk, used for both the effective tier and the trace's lineage. An
+    // UNCLASSIFIED field is denied without walking at all — nothing upstream can
+    // make an unknown field disclosable, so the traversal would be wasted.
     const lineage = declared === 'UNCLASSIFIED' ? [] : graph.lineageSync(request.requested);
+    const effective = effectiveFromHops(declared, lineage);
     const { decision, rule, rationale } = evaluate(request, declared, effective);
     return {
         traceId: meta.traceId,
