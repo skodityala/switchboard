@@ -89,6 +89,17 @@ export class GeminiReasoner implements ReasonerPort {
   private readonly opts: GeminiReasonerOptions;
   /** Populated per turn so the trace can record what the model asked for. */
   private lastModelIntent: Intent = 'UNKNOWN';
+  /**
+   * How many turns the MODEL actually resolved, and how many the fallback did.
+   *
+   * These exist because the fallback is silent by design — an outage must not
+   * take the phone line down — and a silent fallback makes "we called Gemini at
+   * runtime" unfalsifiable. Without a counter the live test passes identically
+   * whether the API answered or @google/genai was never installed: a green test
+   * proving nothing, and a sponsor-tech claim we could not defend.
+   */
+  private modelCalls = 0;
+  private fallbackCalls = 0;
 
   constructor(opts: GeminiReasonerOptions = {}) {
     this.opts = opts;
@@ -126,13 +137,37 @@ export class GeminiReasoner implements ReasonerPort {
     return this.lastModelIntent;
   }
 
+  /** Turns the model resolved. Zero after a run means the model never ran. */
+  get modelResolvedTurns(): number {
+    return this.modelCalls;
+  }
+
+  /** Turns the deterministic fallback resolved because the model failed. */
+  get fallbackResolvedTurns(): number {
+    return this.fallbackCalls;
+  }
+
   /** Ask the model for an intent, and constrain its answer to the known set. */
   async classifyIntentAsync(text: string): Promise<Intent> {
     const client = await this.ensureClient();
     const res = await client.models.generateContent({
       model: this.opts.model ?? 'gemini-2.5-flash',
       contents: classifyPrompt(text),
-      config: { temperature: 0, maxOutputTokens: 16 },
+      config: {
+        temperature: 0,
+        // THINKING MUST BE OFF. gemini-2.5-* are thinking models, and reasoning
+        // tokens are drawn from this same budget BEFORE any visible text. With
+        // a 16-token cap the model spent the whole budget thinking and returned
+        // finishReason MAX_TOKENS with text: "" — so every utterance classified
+        // as UNKNOWN. Verified against the live API.
+        //
+        // The failure was invisible: UNKNOWN is a legal intent that reads
+        // nothing, and respond()'s fallback then answered correctly, so the
+        // adapter looked healthy while the model contributed nothing at all.
+        // This is a one-word label task; there is nothing to think about.
+        thinkingConfig: { thinkingBudget: 0 },
+        maxOutputTokens: 16,
+      },
     });
 
     // Digits are significant: ASK_SSN_LAST4 is a real intent, and an earlier
@@ -165,10 +200,12 @@ export class GeminiReasoner implements ReasonerPort {
     } catch (err) {
       // A model outage must not open the gate, and must not take the line down.
       if (this.opts.fallback) {
+        this.fallbackCalls++;
         return this.opts.fallback.respond(utterance, state, catalog);
       }
       throw err;
     }
+    this.modelCalls++;
     this.lastModelIntent = intent;
 
     return runTurn(utterance, state, catalog, intent, started);
