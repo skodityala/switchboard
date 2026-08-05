@@ -4,6 +4,14 @@ dist/
 .DS_Store
 *.log
 
+# Credentials. Every adapter reads from the environment; nothing is ever
+# committed. Adapter runbooks are in docs/adapters/.
+.env
+.env.*
+!.env.example
+*.pem
+*.crt
+
 # Local SQLite artifacts — fixtures are committed as .sql/.json seeds, not binaries
 *.db
 *.db-journal
